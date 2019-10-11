@@ -3,7 +3,6 @@
 use gmbr::device::Device;
 
 fn main() {
-    let device: Device::new();
+    let device : Device = Device::new();
     device.run();
-    println!("Hello, world!");
 }
