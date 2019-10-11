@@ -1,5 +1,5 @@
 [package]
-name = "GMBR"
+name = "gmbr"
 version = "0.1.0"
 authors = ["alfredu"]
 edition = "2018"
