@@ -5,3 +5,5 @@ pub mod device;
 
 mod cpu;
 mod registers;
+mod mmu;
+mod mbc;
