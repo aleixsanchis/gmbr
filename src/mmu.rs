@@ -19,4 +19,10 @@ impl MMU{
     pub fn read_word(&self, address: u16) -> u16{
         return 0;
     }
+    pub fn write_byte(&self, address: u16, value: u8){
+        ()
+    }
+    pub fn write_word(&self, address: u16, value: u16){
+        ()
+    }
 }

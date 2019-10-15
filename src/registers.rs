@@ -13,6 +13,14 @@ pub struct Registers{
     pub sp: u16,
 }
 
+pub enum CpuFlags
+{
+    C = 0b00010000,
+    H = 0b00100000,
+    N = 0b01000000,
+    Z = 0b10000000,
+}
+
 impl Registers{
     pub fn new() -> Registers{
         Registers{
@@ -63,5 +71,15 @@ impl Registers{
     pub fn sethl(&mut self, value: u16) -> (){
         self.h = (value >> 8) as u8;
         self.l = (value & 0x00FF) as u8;
+    }
+
+    pub fn set_flags(&mut self, flags: CpuFlags, set: bool){
+        let mask = flags as u8;
+        match set {
+            true => self.flags |= mask,
+            false => self.flags &= !mask,
+        }
+
+        self.flags &= 0xF0;
     }
 }
