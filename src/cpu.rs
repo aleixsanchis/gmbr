@@ -67,10 +67,65 @@ impl CPU{
             //LD C, d8
             0x0E => {self.registers.c = self.fetch_byte(); 2},
             //RRCA
-            0x0F => {self.registers.a = self.alu_rrca(self.registers.a); 4},
-
+            0x0F => {self.registers.a = self.alu_rrca(self.registers.a); 1},
+            //STOP TODO
+            0x10 => {(); 1},
+            //LD DE, d16
+            0x11 => {self.registers.setde(self.fetch_word()); 3},
+            //LD (DE), A
+            0x12 => {self.mmu.write_byte(self.registers.de(), self.registers.a); 2},
+            //INC DE
+            0x13 => {self.registers.setde(self.registers.de().wrapping_add(1)); 2},
+            //INC D
+            0x14 => {self.registers.d = self.alu_inc(self.registers.d); 1},
+            //DEC D
+            0x15 => {self.registers.d = self.alu_dec(self.registers.d); 1},
+            //LD D, d8
+            0x16 => {self.registers.d = self.fetch_byte(); 2},
+            //RLA
+            0x17 => {self.registers.a = self.alu_rla(self.registers.a); 1},
+            //JR
+            0x18 => {self.registers.pc = self.calculate_jr_address();3}
+            //ADD HL, DE
+            0x19 => {self.registers.sethl(self.alu_add16(self.registers.hl(), self.registers.bc())); 2},
+            //LD A, (DE)
+            0x1A => {self.registers.a = self.mmu.read_byte(self.registers.bc()); 2},
+            //DEC DE
+            0x1B => {self.registers.setde(self.registers.de().wrapping_sub(1)); 2},
+            //INC E
+            0x1C => {self.registers.e = self.alu_inc(self.registers.e); 1},
+            //DEC E
+            0x1D => {self.registers.e = self.alu_dec(self.registers.e); 1},
+            //LD E, d8
+            0x1E => {self.registers.e = self.fetch_byte(); 2},
+            //RRA
+            0x1F => {self.registers.a = self.alu_rra(self.registers.a); 1},
+            //JR NZ, r8
+            0x20 => {let took_jump = jr_if_nflag(Z); if took_jump {3} else {2}},
+            //LD HL, d16
+            0x21 => {self.registers.hl(self.fetch_word()); 3},
+            //LD (HL+), A
+            0x22 => {self.mmu.write_byte(self.registers.hl(), self.registers.a); self.registers.increment_hl();2},
             _ => {println!("Instruction {:2X} not implemented!", instruction);std::process::exit(1);0},
         }
+    }
+
+    fn jr_if_flag(&mut self, flag: CpuFlags) -> bool{
+        if !self.registers.get_flag(flag){
+            let address = self.calculate_jr_address();
+            self.registers.pc = address;
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    fn calculate_jr_address(&mut self) -> u16{
+        let pc = self.registers.pc as u32 as i32;
+
+        pc += self.fetch_byte() as i32;
+        return pc as u16;
     }
 
     fn alu_inc(&mut self, value: u8) -> u8{
@@ -101,6 +156,26 @@ impl CPU{
         return r_value;
     }
 
+    fn alu_rla(&mut self, value: u8) -> u8{
+        
+        let r_value = value << 1;
+        let carry_was_one : bool = self.registers.get_flag(C);
+
+        if carry_was_one {
+            r_value |= 0x01;
+        }
+        else{
+            r_value &= 0xFE;
+        }
+
+        self.registers.set_flags(Z, r_value == 0);
+        self.registers.set_flags(N, false);
+        self.registers.set_flags(H, false);
+        self.registers.set_flags(C, value & 0x80 == 0x80);
+
+        return r_value;
+    }
+
     fn alu_rrca(&mut self, value: u8) -> u8{
         let r_value = value.rotate_right(1);
 
@@ -109,6 +184,24 @@ impl CPU{
         self.registers.set_flags(H, false);
         self.registers.set_flags(C, value & 0x01 == 0x01);
         return r_value;
+    }
+
+    fn alu_rra(&mut self, value: u8) -> u8{
+        let r_value = value >> 1;
+        let carry_was_one : bool = self.registers.get_flag(C);
+
+        if carry_was_one {
+            r_value |= 0x80;
+        }
+
+        else{
+            r_value &= 0x7F;
+        }
+
+        self.registers.set_flags(Z, r_value == 0);
+        self.registers.set_flags(N, false);
+        self.registers.set_flags(H, false);
+        self.registers.set_flags(C, value & 0x01 == 0x01);  
     }
 
     fn alu_add16(&mut self, a: u16, b: u16) -> u16{

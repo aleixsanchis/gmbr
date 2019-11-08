@@ -73,13 +73,28 @@ impl Registers{
         self.l = (value & 0x00FF) as u8;
     }
 
+    pub fn increment_hl(&mut self) -> (){
+        let value = self.hl();
+        value.wrapping_add(1);
+        self.sethl(value);
+    }
+
+    pub fn decrement_hl(&mut self) -> (){
+        let value = self.hl();
+        value.wrapping_sub(1);
+        self.sethl(value);
+    }
+
     pub fn set_flags(&mut self, flags: CpuFlags, set: bool){
         let mask = flags as u8;
         match set {
             true => self.flags |= mask,
             false => self.flags &= !mask,
         }
-
         self.flags &= 0xF0;
+    }
+
+    pub fn get_flag(&mut self, flag: CpuFlags) -> bool{
+        return self.flags & (flag as u8) != 0;
     }
 }
