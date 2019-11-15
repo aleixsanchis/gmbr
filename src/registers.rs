@@ -42,15 +42,15 @@ impl Registers{
     }
 
     pub fn bc(&self) -> u16{
-        return ((self.b as u16) << 8) | ((self.c & 0xF0) as u16);
+        return ((self.b as u16) << 8) | (self.c as u16);
     }
 
     pub fn de(&self) -> u16{
-        return ((self.d as u16) << 8) | ((self.e & 0xF0) as u16);
+        return ((self.d as u16) << 8) | (self.e as u16);
     }
 
     pub fn hl(&self) -> u16{
-        return ((self.h as u16) << 8) | ((self.l & 0xF0) as u16);
+        return ((self.h as u16) << 8) | (self.l as u16);
     }
 
     pub fn setaf(&mut self, value: u16) -> (){

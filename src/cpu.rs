@@ -1,14 +1,14 @@
-use crate::registers::CpuFlags::{C, N, H, Z};
+use crate::registers::CpuFlags;
 use crate::registers::Registers;
 use crate::mmu::MMU;
-pub struct CPU {
+pub struct CPU<'a>{
     registers: Registers,
-    mmu: MMU,
+    mmu: MMU<'a>,
 }
 
-impl CPU{
+impl CPU<'_>{
 
-    pub fn new() -> CPU{
+    pub fn new() -> CPU<'static>{
         CPU{
             registers: Registers::new(),
             mmu: MMU::new(),
@@ -18,7 +18,10 @@ impl CPU{
     pub fn do_cycle(&mut self){
         let instruction : u8 = self.mmu.read_byte(self.registers.pc);
         self.registers.pc+=1;
-        self.execute_instruction(instruction);
+        let cycles = self.execute_instruction(instruction);
+        if cycles == 0{
+            std::process::exit(0);
+        }
     }
 
     fn fetch_word(&mut self) -> u16{
@@ -39,7 +42,7 @@ impl CPU{
             //NOP
             0x00 => {1},
             //LD BC, d16
-            0x01 => {self.registers.setbc(self.fetch_word()); 3},
+            0x01 => {let value = self.fetch_word(); self.registers.setbc(value); 3},
             //LD (BC), A
             0x02 => {self.mmu.write_byte(self.registers.bc(), self.registers.a); 2},
             //INC BC
@@ -53,9 +56,9 @@ impl CPU{
             //RLCA
             0x07 => {self.registers.a = self.alu_rlca(self.registers.a); 1},
             //LD (a16), SP
-            0x08 => {self.mmu.write_word(self.fetch_word(), self.registers.sp); 5},
+            0x08 => {let value = self.fetch_word(); self.mmu.write_word(value, self.registers.sp); 5},
             //ADD HL,BC
-            0x09 => {self.registers.sethl(self.alu_add16(self.registers.hl(), self.registers.bc())); 2},
+            0x09 => {let value = self.alu_add16(self.registers.hl(), self.registers.bc()); self.registers.sethl(value); 2},
             //LD A, (BC)
             0x0A => {self.registers.a = self.mmu.read_byte(self.registers.bc()); 2},
             //DEC BC
@@ -71,7 +74,7 @@ impl CPU{
             //STOP TODO
             0x10 => {(); 1},
             //LD DE, d16
-            0x11 => {self.registers.setde(self.fetch_word()); 3},
+            0x11 => {let value = self.fetch_word(); self.registers.setde(value); 3},
             //LD (DE), A
             0x12 => {self.mmu.write_byte(self.registers.de(), self.registers.a); 2},
             //INC DE
@@ -87,9 +90,9 @@ impl CPU{
             //JR
             0x18 => {self.registers.pc = self.calculate_jr_address();3}
             //ADD HL, DE
-            0x19 => {self.registers.sethl(self.alu_add16(self.registers.hl(), self.registers.bc())); 2},
+            0x19 => {let value = self.alu_add16(self.registers.hl(), self.registers.de()); self.registers.sethl(value); 2},
             //LD A, (DE)
-            0x1A => {self.registers.a = self.mmu.read_byte(self.registers.bc()); 2},
+            0x1A => {self.registers.a = self.mmu.read_byte(self.registers.de()); 2},
             //DEC DE
             0x1B => {self.registers.setde(self.registers.de().wrapping_sub(1)); 2},
             //INC E
@@ -101,16 +104,26 @@ impl CPU{
             //RRA
             0x1F => {self.registers.a = self.alu_rra(self.registers.a); 1},
             //JR NZ, r8
-            0x20 => {let took_jump = jr_if_nflag(Z); if took_jump {3} else {2}},
+            0x20 => {let took_jump = self.jr_if_nflag(CpuFlags::Z); if took_jump {3} else {2}},
             //LD HL, d16
-            0x21 => {self.registers.hl(self.fetch_word()); 3},
+            0x21 => {let value = self.fetch_word(); self.registers.sethl(value); 3},
             //LD (HL+), A
             0x22 => {self.mmu.write_byte(self.registers.hl(), self.registers.a); self.registers.increment_hl();2},
-            _ => {println!("Instruction {:2X} not implemented!", instruction);std::process::exit(1);0},
+            //INC HL
+            0x23 => {self.registers.increment_hl(); 2},
+            //INC H
+            0x24 => {self.registers.h = self.alu_inc(self.registers.h); 1},
+            //DEC H
+            0x25 => {self.registers.h = self.alu_dec(self.registers.h); 1},
+            //LD H, d8
+            0x26 => {self.registers.h = self.fetch_byte(); 2},
+            //DAA TODO
+            0x27 => {(); 1},
+            _ => {println!("Instruction {:2X} not implemented!", instruction);0},
         }
     }
 
-    fn jr_if_flag(&mut self, flag: CpuFlags) -> bool{
+    fn jr_if_nflag(&mut self, flag: CpuFlags) -> bool{
         if !self.registers.get_flag(flag){
             let address = self.calculate_jr_address();
             self.registers.pc = address;
@@ -122,7 +135,7 @@ impl CPU{
     }
 
     fn calculate_jr_address(&mut self) -> u16{
-        let pc = self.registers.pc as u32 as i32;
+        let mut pc = self.registers.pc as u32 as i32;
 
         pc += self.fetch_byte() as i32;
         return pc as u16;
@@ -131,35 +144,35 @@ impl CPU{
     fn alu_inc(&mut self, value: u8) -> u8{
         let inc_value = value.wrapping_add(1);
 
-        self.registers.set_flags(Z, inc_value == 0);
-        self.registers.set_flags(H, is_half_carry_add8(value, 1));
-        self.registers.set_flags(N, false);
+        self.registers.set_flags(CpuFlags::Z, inc_value == 0);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_add8(value, 1));
+        self.registers.set_flags(CpuFlags::N, false);
         return inc_value;
     }
 
     fn alu_dec(&mut self, value: u8) -> u8{
         let dec_value = value.wrapping_sub(1);
 
-        self.registers.set_flags(Z, dec_value == 0);
-        self.registers.set_flags(H, is_half_carry_sub8(value, 1));
-        self.registers.set_flags(N, true);
+        self.registers.set_flags(CpuFlags::Z, dec_value == 0);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_sub8(value, 1));
+        self.registers.set_flags(CpuFlags::N, true);
         return dec_value;
     }
 
     fn alu_rlca(&mut self, value: u8) -> u8{
         let r_value = value.rotate_left(1);
 
-        self.registers.set_flags(Z, r_value == 0);
-        self.registers.set_flags(N, false);
-        self.registers.set_flags(H, false);
-        self.registers.set_flags(C, value & 0x80 == 0x80);
+        self.registers.set_flags(CpuFlags::Z, r_value == 0);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers.set_flags(CpuFlags::C, value & 0x80 == 0x80);
         return r_value;
     }
 
     fn alu_rla(&mut self, value: u8) -> u8{
         
-        let r_value = value << 1;
-        let carry_was_one : bool = self.registers.get_flag(C);
+        let mut r_value = value << 1;
+        let carry_was_one : bool = self.registers.get_flag(CpuFlags::C);
 
         if carry_was_one {
             r_value |= 0x01;
@@ -168,10 +181,10 @@ impl CPU{
             r_value &= 0xFE;
         }
 
-        self.registers.set_flags(Z, r_value == 0);
-        self.registers.set_flags(N, false);
-        self.registers.set_flags(H, false);
-        self.registers.set_flags(C, value & 0x80 == 0x80);
+        self.registers.set_flags(CpuFlags::Z, r_value == 0);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers.set_flags(CpuFlags::C, value & 0x80 == 0x80);
 
         return r_value;
     }
@@ -179,16 +192,16 @@ impl CPU{
     fn alu_rrca(&mut self, value: u8) -> u8{
         let r_value = value.rotate_right(1);
 
-        self.registers.set_flags(Z, r_value == 0);
-        self.registers.set_flags(N, false);
-        self.registers.set_flags(H, false);
-        self.registers.set_flags(C, value & 0x01 == 0x01);
+        self.registers.set_flags(CpuFlags::Z, r_value == 0);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers.set_flags(CpuFlags::C, value & 0x01 == 0x01);
         return r_value;
     }
 
     fn alu_rra(&mut self, value: u8) -> u8{
-        let r_value = value >> 1;
-        let carry_was_one : bool = self.registers.get_flag(C);
+        let mut r_value = value >> 1;
+        let carry_was_one : bool = self.registers.get_flag(CpuFlags::C);
 
         if carry_was_one {
             r_value |= 0x80;
@@ -198,18 +211,19 @@ impl CPU{
             r_value &= 0x7F;
         }
 
-        self.registers.set_flags(Z, r_value == 0);
-        self.registers.set_flags(N, false);
-        self.registers.set_flags(H, false);
-        self.registers.set_flags(C, value & 0x01 == 0x01);  
+        self.registers.set_flags(CpuFlags::Z, r_value == 0);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers.set_flags(CpuFlags::C, value & 0x01 == 0x01);
+        return r_value;
     }
 
     fn alu_add16(&mut self, a: u16, b: u16) -> u16{
         let sum = a.wrapping_add(b);
 
-        self.registers.set_flags(N, false);
-        self.registers.set_flags(H, is_half_carry_add16(a, b));
-        self.registers.set_flags(C, is_carry_add16(a,b));
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_add16(a, b));
+        self.registers.set_flags(CpuFlags::C, is_carry_add16(a,b));
         return sum;
     }
 
