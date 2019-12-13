@@ -1,14 +1,14 @@
 use crate::registers::CpuFlags;
 use crate::registers::Registers;
 use crate::mmu::MMU;
-pub struct CPU<'a>{
+pub struct CPU{
     registers: Registers,
-    mmu: MMU<'a>,
+    mmu: MMU,
 }
 
-impl CPU<'_>{
+impl CPU{
 
-    pub fn new() -> CPU<'static>{
+    pub fn new() -> CPU{
         CPU{
             registers: Registers::new(),
             mmu: MMU::new(),

@@ -1,10 +1,10 @@
 use crate::cpu::CPU;
-pub struct Device<'a>{
-    cpu: CPU<'a>,
+pub struct Device{
+    cpu: CPU,
 }
 
-impl Device<'_>{
-    pub fn new() -> Device<'static>{
+impl Device{
+    pub fn new() -> Device{
         Device{
             cpu: CPU::new(),
         }

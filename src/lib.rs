@@ -7,3 +7,4 @@ mod cpu;
 mod registers;
 mod mmu;
 mod mbc;
+mod mbc0;
