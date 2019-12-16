@@ -75,14 +75,13 @@ impl Registers{
 
     pub fn increment_hl(&mut self) -> (){
         let value = self.hl();
-        value.wrapping_add(1);
-        self.sethl(value);
+        self.sethl(value.wrapping_add(1));
     }
 
     pub fn decrement_hl(&mut self) -> (){
         let value = self.hl();
-        value.wrapping_sub(1);
-        self.sethl(value);
+        self.sethl(value.wrapping_sub(1));
+        
     }
 
     pub fn set_flags(&mut self, flags: CpuFlags, set: bool){

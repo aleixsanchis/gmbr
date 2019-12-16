@@ -5,13 +5,21 @@ pub struct CPU{
     registers: Registers,
     mmu: MMU,
 }
-
+pub enum MBCType{
+    MBC0,
+}
 impl CPU{
 
     pub fn new() -> CPU{
         CPU{
             registers: Registers::new(),
             mmu: MMU::new(),
+        }
+    }
+
+    pub fn swap_mbc(mbc_type : MBCType){
+        match mbc_type{
+            MBCType::MBC0 => {println!("Not swapping the MBC");}
         }
     }
 
@@ -227,8 +235,8 @@ impl CPU{
         return sum;
     }
 
-    pub fn run(mut self){
-        println!("CPU Running!\n Register a value is : {}\n", self.registers.a);
+    pub fn run(&mut self){
+        println!("\nCPU Running!\n Register A value is : {}\n", self.registers.a);
         loop{
             self.do_cycle();
             

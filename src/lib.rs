@@ -2,6 +2,7 @@
 #![crate_type = "lib" ]
 
 pub mod device;
+pub mod cli;
 
 mod cpu;
 mod registers;
