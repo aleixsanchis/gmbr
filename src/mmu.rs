@@ -1,8 +1,12 @@
 use crate::mbc::MBC;
+use std::path::PathBuf;
+use std::str;
+
 const ROM_START : usize = 0x0000;
 const VRAM_START : usize = 0x8000;
 const ROM_SIZE : usize = 0x8000;
 const VRAM_SIZE : usize = 0x2000;
+
 pub struct MMU{
     mbc: Box<dyn MBC>,
 }
@@ -24,5 +28,9 @@ impl MMU{
     }
     pub fn write_word(&mut self, address: u16, value: u16){
         self.mbc.write_word(address, value);
+    }
+
+    pub fn open_rom(&mut self, rom_path : PathBuf){
+        self.mbc.open_rom(rom_path);
     }
 }

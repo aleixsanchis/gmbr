@@ -1,6 +1,8 @@
 use crate::registers::CpuFlags;
 use crate::registers::Registers;
 use crate::mmu::MMU;
+use std::path::PathBuf;
+
 pub struct CPU{
     registers: Registers,
     mmu: MMU,
@@ -23,13 +25,16 @@ impl CPU{
         }
     }
 
-    pub fn do_cycle(&mut self){
+    pub fn open_rom(&mut self, rom_path: PathBuf){
+        self.mmu.open_rom(rom_path);
+    }
+
+    pub fn do_cycle(&mut self) -> u8 {
         let instruction : u8 = self.mmu.read_byte(self.registers.pc);
         self.registers.pc+=1;
         let cycles = self.execute_instruction(instruction);
-        if cycles == 0{
-            std::process::exit(0);
-        }
+
+        return cycles;
     }
 
     fn fetch_word(&mut self) -> u16{
@@ -127,7 +132,7 @@ impl CPU{
             0x26 => {self.registers.h = self.fetch_byte(); 2},
             //DAA TODO
             0x27 => {(); 1},
-            _ => {println!("Instruction {:2X} not implemented!", instruction);0},
+            _ => {panic!("Instruction {:2X} not implemented!", instruction);0},
         }
     }
 
@@ -233,14 +238,6 @@ impl CPU{
         self.registers.set_flags(CpuFlags::H, is_half_carry_add16(a, b));
         self.registers.set_flags(CpuFlags::C, is_carry_add16(a,b));
         return sum;
-    }
-
-    pub fn run(&mut self){
-        println!("\nCPU Running!\n Register A value is : {}\n", self.registers.a);
-        loop{
-            self.do_cycle();
-            
-        }
     }
 }
 
