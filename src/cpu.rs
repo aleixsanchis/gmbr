@@ -37,6 +37,10 @@ impl CPU{
         return cycles;
     }
 
+    pub fn print_debug_info(&self){
+        println!("{:#4X?}", self.registers);
+    }
+
     fn fetch_word(&mut self) -> u16{
         let word = self.mmu.read_word(self.registers.pc);
         self.registers.pc+=2;
@@ -52,106 +56,175 @@ impl CPU{
     // Executes an instruction, returns the cycles spent
     fn execute_instruction(&mut self, instruction: u8) -> u8{
         match instruction {
-            //NOP
+            // NOP
             0x00 => {1},
-            //LD BC, d16
+            // LD BC, d16
             0x01 => {let value = self.fetch_word(); self.registers.setbc(value); 3},
-            //LD (BC), A
+            // LD (BC), A
             0x02 => {self.mmu.write_byte(self.registers.bc(), self.registers.a); 2},
-            //INC BC
+            // INC BC
             0x03 => {self.registers.setbc(self.registers.bc().wrapping_add(1)); 2},
-            //INC B
+            // INC B
             0x04 => {self.registers.b = self.alu_inc(self.registers.b); 1},
-            //DEC B
+            // DEC B
             0x05 => {self.registers.b = self.alu_dec(self.registers.b); 1},
-            //LD B, d8
+            // LD B, d8
             0x06 => {self.registers.b = self.fetch_byte(); 2},
-            //RLCA
+            // RLCA
             0x07 => {self.registers.a = self.alu_rlca(self.registers.a); 1},
-            //LD (a16), SP
+            // LD (a16), SP
             0x08 => {let value = self.fetch_word(); self.mmu.write_word(value, self.registers.sp); 5},
-            //ADD HL,BC
+            // ADD HL,BC
             0x09 => {let value = self.alu_add16(self.registers.hl(), self.registers.bc()); self.registers.sethl(value); 2},
-            //LD A, (BC)
+            // LD A, (BC)
             0x0A => {self.registers.a = self.mmu.read_byte(self.registers.bc()); 2},
-            //DEC BC
+            // DEC BC
             0x0B => {self.registers.setbc(self.registers.bc().wrapping_sub(1)); 2},
-            //INC C
+            // INC C
             0x0C => {self.registers.c = self.alu_inc(self.registers.c); 1},
-            //DEC C
+            // DEC C
             0x0D => {self.registers.c = self.alu_dec(self.registers.c); 1},
-            //LD C, d8
+            // LD C, d8
             0x0E => {self.registers.c = self.fetch_byte(); 2},
-            //RRCA
+            // RRCA
             0x0F => {self.registers.a = self.alu_rrca(self.registers.a); 1},
-            //STOP TODO
+            // STOP TODO
             0x10 => {(); 1},
-            //LD DE, d16
+            // LD DE, d16
             0x11 => {let value = self.fetch_word(); self.registers.setde(value); 3},
-            //LD (DE), A
+            // LD (DE), A
             0x12 => {self.mmu.write_byte(self.registers.de(), self.registers.a); 2},
-            //INC DE
+            // INC DE
             0x13 => {self.registers.setde(self.registers.de().wrapping_add(1)); 2},
-            //INC D
+            // INC D
             0x14 => {self.registers.d = self.alu_inc(self.registers.d); 1},
-            //DEC D
+            // DEC D
             0x15 => {self.registers.d = self.alu_dec(self.registers.d); 1},
-            //LD D, d8
+            // LD D, d8
             0x16 => {self.registers.d = self.fetch_byte(); 2},
-            //RLA
+            // RLA
             0x17 => {self.registers.a = self.alu_rla(self.registers.a); 1},
-            //JR
+            // JR
             0x18 => {self.registers.pc = self.calculate_jr_address();3}
-            //ADD HL, DE
+            // ADD HL, DE
             0x19 => {let value = self.alu_add16(self.registers.hl(), self.registers.de()); self.registers.sethl(value); 2},
-            //LD A, (DE)
+            // LD A, (DE)
             0x1A => {self.registers.a = self.mmu.read_byte(self.registers.de()); 2},
-            //DEC DE
+            // DEC DE
             0x1B => {self.registers.setde(self.registers.de().wrapping_sub(1)); 2},
-            //INC E
+            // INC E
             0x1C => {self.registers.e = self.alu_inc(self.registers.e); 1},
-            //DEC E
+            // DEC E
             0x1D => {self.registers.e = self.alu_dec(self.registers.e); 1},
-            //LD E, d8
+            // LD E, d8
             0x1E => {self.registers.e = self.fetch_byte(); 2},
-            //RRA
+            // RRA
             0x1F => {self.registers.a = self.alu_rra(self.registers.a); 1},
-            //JR NZ, r8
-            0x20 => {let took_jump = self.jr_if_nflag(CpuFlags::Z); if took_jump {3} else {2}},
-            //LD HL, d16
+            // JR NZ, r8
+            0x20 => {let took_jump = self.jr_if_nflag(CpuFlags::Z); took_jump},
+            // LD HL, d16
             0x21 => {let value = self.fetch_word(); self.registers.sethl(value); 3},
-            //LD (HL+), A
-            0x22 => {self.mmu.write_byte(self.registers.hl(), self.registers.a); self.registers.increment_hl();2},
-            //INC HL
+            // LD (HL+), A
+            0x22 => {self.mmu.write_byte(self.registers.hl_and_inc(), self.registers.a);2},
+            // INC HL
             0x23 => {self.registers.increment_hl(); 2},
-            //INC H
+            // INC H
             0x24 => {self.registers.h = self.alu_inc(self.registers.h); 1},
-            //DEC H
+            // DEC H
             0x25 => {self.registers.h = self.alu_dec(self.registers.h); 1},
-            //LD H, d8
+            // LD H, d8
             0x26 => {self.registers.h = self.fetch_byte(); 2},
-            //DAA TODO
+            // DAA TODO
             0x27 => {(); 1},
-            _ => {panic!("Instruction {:2X} not implemented!", instruction);0},
+            // JR Z, r8
+            0x28 => {let took_jump = self.jr_if_flag(CpuFlags::Z); took_jump},
+            // ADD HL, HL
+            0x29 => {let value = self.alu_add16(self.registers.hl(), self.registers.hl()); self.registers.sethl(value); 2},
+            // LD A, (HL+)
+            0x2A => {self.registers.a = self.mmu.read_byte(self.registers.hl_and_inc()); 2}
+            // DEC HL
+            0x2B => {self.registers.decrement_hl(); 2},
+            // INC L
+            0x2C => {self.registers.l = self.alu_inc(self.registers.l); 1}
+            // DEC L
+            0x2D => {self.registers.l = self.alu_dec(self.registers.l); 1},
+            // LD L, d8
+            0x2E => {self.registers.l = self.fetch_byte(); 2},
+            // CPL
+            0x2F => {self.alu_cpl();0}
+            // JR NC, r8
+            0x30 => {let took_jump = self.jr_if_nflag(CpuFlags::C); took_jump},
+            // LD (HL-), A
+            0x32 => {self.mmu.write_byte(self.registers.hl_and_dec(), self.registers.a);2},
+            // JR C, r8
+            0x38 => {let took_jump = self.jr_if_flag(CpuFlags::C); took_jump},
+            //LD A, d8
+            0x3E => {self.registers.a = self.fetch_byte(); 2},
+            // XOR A
+            0xAF => {self.registers.a = self.alu_xor(self.registers.a); 1},
+            // JP a16
+            0xC3 => {let address = self.fetch_word(); self.jump_to(address); 4},
+
+            // LDH (a8), A
+            0xE0 => {let immediate = self.fetch_byte(); self.mmu.write_byte(0xFF00 + immediate as u16, self.registers.a); 3},
+
+            // LDH A, (a8)
+            0xF0 => {let immediate = self.fetch_byte(); self.registers.a = self.mmu.read_byte(0xFF00 + immediate as u16); 3},
+            // DI TODO
+            0xF3 => {0},
+            _ => {panic!("Instruction 0x{:2X} not implemented!\n
+            {:#4X?}", instruction, self.registers);},
         }
     }
 
-    fn jr_if_nflag(&mut self, flag: CpuFlags) -> bool{
+    fn jr_if_nflag(&mut self, flag: CpuFlags) -> u8{
+        let address = self.calculate_jr_address();
         if !self.registers.get_flag(flag){
-            let address = self.calculate_jr_address();
-            self.registers.pc = address;
-            return true;
+            self.jump_to(address);
+            return 3;
         }
         else{
-            return false;
+            return 2;
         }
+    }
+
+    fn jr_if_flag(&mut self, flag: CpuFlags) -> u8{
+        let address = self.calculate_jr_address();
+        if self.registers.get_flag(flag){
+            self.jump_to(address);
+            return 3;
+        }
+        else{
+            return 2;
+        }
+    }
+
+    fn alu_cpl(&mut self){
+        self.registers.a = !self.registers.a;
+
+        self.registers.set_flags(CpuFlags::N, true);
+        self.registers.set_flags(CpuFlags::H, true);
     }
 
     fn calculate_jr_address(&mut self) -> u16{
         let mut pc = self.registers.pc as u32 as i32;
 
-        pc += self.fetch_byte() as i32;
+        pc += (self.fetch_byte() as i8 as i32);
         return pc as u16;
+    }
+
+    fn jump_to(&mut self, address: u16) {
+        self.registers.pc = address;
+    }
+
+    fn alu_xor(&mut self, operand: u8) -> u8{
+        let value = self.registers.a ^ operand;
+        self.registers.set_flags(CpuFlags::Z, value == 0);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers.set_flags(CpuFlags::C, false);
+
+        return value;
     }
 
     fn alu_inc(&mut self, value: u8) -> u8{
@@ -254,5 +327,5 @@ fn is_half_carry_add8(a: u8, value: u8) -> bool{
 }
 
 fn is_half_carry_sub8(a: u8, value: u8) -> bool{
-    return ((a & 0xF) - (value & 0xF)) < 0;
+    return ((a & 0xF) as i8 - (value & 0xF) as i8) < 0;
 }

@@ -14,10 +14,7 @@ impl mbc::MBC for MBC0{
     }
     fn read_word(&self, address: u16) -> u16{
 
-        let mut value : u16 = self.rom[address as usize] as u16;
-        value = value | ((self.rom[(address+1) as usize] as u16) <<8);
-
-        return value;
+        return (self.rom[address as usize] as u16) | ((self.rom[(address+1) as usize] as u16) << 8);
     }
     fn write_byte(&mut self, address: u16, value: u8){
 
@@ -26,7 +23,7 @@ impl mbc::MBC for MBC0{
     fn write_word(&mut self, address: u16, value: u16){
 
         self.rom[address as usize ] = value as u8;
-        self.rom[address as usize +1] = (value>>8) as u8;
+        self.rom[(address + 1) as usize] = (value>>8) as u8;
     }
 
     fn open_rom(&mut self, rom_path : PathBuf){
@@ -45,11 +42,10 @@ impl mbc::MBC for MBC0{
         }
         //Rom size is indicated in byte 0x148
         let rom_size : usize = 32768 << header[0x48];
-        assert_eq!(self.rom.len(), rom_size);
+        assert_eq!(self.rom.len(), rom_size, "The ROM size reported by the header and the ROM file size don't match. Maybe the file is corrupted. Closing the emulator...");
         if header[0x49] != 0 {
             panic!("RAM not implemented yet! Closing the emulator...")
         }
-        let ram_size = 0;
     }
 }
 

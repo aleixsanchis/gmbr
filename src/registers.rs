@@ -1,4 +1,4 @@
-
+#[derive(Debug)]
 pub struct Registers{
     pub a: u8,
     pub b: u8,
@@ -73,6 +73,16 @@ impl Registers{
         self.l = (value & 0x00FF) as u8;
     }
 
+    pub fn hl_and_inc(&mut self) -> u16{
+        let hl = self.hl();
+        self.increment_hl();
+        return hl;
+    }
+    pub fn hl_and_dec(&mut self) -> u16{
+        let hl = self.hl();
+        self.decrement_hl();
+        return hl;
+    }
     pub fn increment_hl(&mut self) -> (){
         let value = self.hl();
         self.sethl(value.wrapping_add(1));

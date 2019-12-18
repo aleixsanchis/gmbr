@@ -4,6 +4,11 @@ use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
+pub fn read_any_key(){
+    let mut scanned_line = String::new();
+    io::stdin().read_line(&mut scanned_line).unwrap();
+}
+
 pub fn choose_rom(settings : &config::Config) -> PathBuf{
     let roms_folder = fs::read_dir(settings.get_str("roms_folder").unwrap()).unwrap();
     let roms_number = roms_folder.count();
