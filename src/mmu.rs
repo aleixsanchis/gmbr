@@ -1,42 +1,46 @@
 use crate::mbc::MBC;
+use crate::gpu::GPU;
 use std::path::PathBuf;
 
 
 
-const ROM_START : u16 = 0x0000;
-const ROM_END : u16 = 0x7FFF;
+const ROM_START : usize = 0x0000;
+const ROM_END : usize = 0x7FFF;
 
-const VRAM_START : u16 = 0x8000;
-const VRAM_SIZE : u16 = 0x9FFF;
+const VRAM_START : usize = 0x8000;
+const VRAM_END : usize = 0x9FFF;
 
-const RAM_START : u16 = 0xC000;
-const RAM_END : u16 = 0xDFFF;
-const RAM_SIZE : u16 = RAM_END - RAM_START;
+const RAM_START : usize = 0xC000;
+const RAM_END : usize = 0xDFFF;
+const RAM_SIZE : usize = (RAM_END - RAM_START)+1;
 
-const HRAM_START: u16 = 0xFF80;
-const HRAM_END : u16 = 0xFFFE;
-const HRAM_SIZE : u16 = HRAM_END - HRAM_START;
+const HRAM_START: usize = 0xFF80;
+const HRAM_END : usize = 0xFFFE;
+const HRAM_SIZE : usize = (HRAM_END - HRAM_START)+1;
 
 pub struct MMU{
     mbc: Box<dyn MBC>,
-    ram: [u8; (RAM_SIZE+1) as usize],
-    high_ram: [u8; (HRAM_SIZE+1) as usize],
+    ram: [u8; RAM_SIZE],
+    high_ram: [u8; HRAM_SIZE],
+    pub gpu: GPU,
 }
 
 impl MMU{
     pub fn new() -> MMU{
         MMU{
             mbc: Box::new(crate::mbc0::MBC0::new()),
-            ram: [0; (RAM_SIZE+1) as usize],
-            high_ram: [0; (HRAM_SIZE+1) as usize]
+            ram: [0; RAM_SIZE as usize],
+            high_ram: [0; HRAM_SIZE as usize],
+            gpu: GPU::new(),
         }
     }
     pub fn read_byte(&self, address: u16) -> u8{
-        match address {
+        match address as usize {
             ROM_START..=ROM_END => return self.mbc.read_byte(address),
-            RAM_START..=RAM_END => return self.ram[(address - RAM_START) as usize],
+            VRAM_START..=VRAM_END => return self.gpu.vram[address as usize - VRAM_START],
+            RAM_START..=RAM_END => return self.ram[(address as usize - RAM_START)],
 
-            HRAM_START..=HRAM_END => return self.high_ram[(address - HRAM_START) as usize],
+            HRAM_START..=HRAM_END => return self.high_ram[(address as usize - HRAM_START)],
             _ => panic!("This memory section is not supported yet. The location was {:#6X}", address),
 
         }
@@ -46,12 +50,12 @@ impl MMU{
         return (self.read_byte(address) as u16) | ((self.read_byte(address + 1) as u16) << 8);
     }
     pub fn write_byte(&mut self, address: u16, value: u8){
-        match address {
+        match address as usize {
             ROM_START..=ROM_END => return self.mbc.write_byte(address, value),
 
-            RAM_START..=RAM_END => self.ram[(address - RAM_START)as usize] = value,
+            RAM_START..=RAM_END => self.ram[(address as usize - RAM_START)] = value,
 
-            HRAM_START..=HRAM_END => self.high_ram[(address - HRAM_START) as usize] = value,
+            HRAM_START..=HRAM_END => self.high_ram[(address as usize - HRAM_START)] = value,
             _ => panic!("This memory section is not supported yet. The location was {:#6X}", address),
 
         }

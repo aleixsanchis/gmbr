@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 #[derive(Debug)]
 pub struct Registers{
     pub a: u8,
@@ -34,6 +36,32 @@ impl Registers{
             l: 0x4D,
             sp: 0xFFFE,
             pc:0x0100
+        }
+    }
+
+    pub fn get_register_by_index(&self, index: u8) -> u8{
+        match index {
+            0 => self.b,
+            1 => self.c,
+            2 => self.d,
+            3 => self.e,
+            4 => self.h,
+            5 => self.l,
+            7 => self.a,
+            _ => panic!("Wrong indexing of the Register Bank!")
+        }
+    }
+
+    pub fn set_register_by_index(&mut self, index: u8, value: u8){
+        match index {
+            0 => self.b = value,
+            1 => self.c = value,
+            2 => self.d = value,
+            3 => self.e = value,
+            4 => self.h = value,
+            5 => self.l = value,
+            7 => self.a = value,
+            _ => panic!("Wrong indexing of the Register Bank!")
         }
     }
 
@@ -103,7 +131,7 @@ impl Registers{
         self.flags &= 0xF0;
     }
 
-    pub fn get_flag(&mut self, flag: CpuFlags) -> bool{
+    pub fn get_flag(&self, flag: CpuFlags) -> bool{
         return self.flags & (flag as u8) != 0;
     }
 }

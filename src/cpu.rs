@@ -151,15 +151,44 @@ impl CPU{
             // LD L, d8
             0x2E => {self.registers.l = self.fetch_byte(); 2},
             // CPL
-            0x2F => {self.alu_cpl();0}
+            0x2F => {self.alu_cpl(); 1},
             // JR NC, r8
             0x30 => {let took_jump = self.jr_if_nflag(CpuFlags::C); took_jump},
+            // LD SP, d16
+            0x31 => {let value = self.fetch_word(); self.registers.sp = value; 3}
             // LD (HL-), A
             0x32 => {self.mmu.write_byte(self.registers.hl_and_dec(), self.registers.a);2},
+            // INC SP
+            0x33 => {self.registers.sp = self.registers.sp.wrapping_add(1); 2},
+            // INC (HL)
+            0x34 => {let mut value = self.mmu.read_byte(self.registers.hl()); value = self.alu_inc(value); self.mmu.write_byte(self.registers.hl(), value); 3},
+            // DEC (HL)
+            0x35 => {let mut value = self.mmu.read_byte(self.registers.hl()); value = self.alu_dec(value); self.mmu.write_byte(self.registers.hl(), value); 3},
+            // LD (HL), d8
+            0x36 => {let immediate = self.fetch_byte(); self.mmu.write_byte(self.registers.hl(), immediate); 3},
+            // SCF TODO
+            0x37 => {0},
             // JR C, r8
             0x38 => {let took_jump = self.jr_if_flag(CpuFlags::C); took_jump},
+            // ADD HL, SP
+            0x39 => {let value = self.alu_add16(self.registers.hl(), self.registers.sp); self.registers.sethl(value); 2},
+            // LD A, (HL-)
+            0x3A => {self.registers.a = self.mmu.read_byte(self.registers.hl_and_dec()); 2},
+            // DEC SP
+            0x3B => {self.registers.sp = self.registers.sp.wrapping_sub(1); 2},
+            // INC A
+            0x3C => {self.registers.a = self.alu_inc(self.registers.a); 1},
+            // DEC A
+            0x3D => {self.registers.a = self.alu_dec(self.registers.a); 1},
             //LD A, d8
             0x3E => {self.registers.a = self.fetch_byte(); 2},
+            // CCF
+            0x3F => {self.alu_ccf(); 1},
+            // Register Movements
+            0x40..=0x75 => {self.register_movement(instruction)},
+            // HALT TODO
+            0x76 => {0},
+            0x77..=0x7F => {self.register_movement(instruction)},
             // XOR A
             0xAF => {self.registers.a = self.alu_xor(self.registers.a); 1},
             // JP a16
@@ -199,6 +228,36 @@ impl CPU{
         }
     }
 
+    fn register_movement(&mut self, opcode: u8) -> u8{
+        if opcode & 0x40 == 0x40{
+            let destination_register = ( ( ((opcode & 0xF0) >> 4) - 0x04) * 2) + ((opcode & 0x08) >> 3);
+            let source_register = opcode & 0x07;
+
+            if destination_register == source_register {
+                return 1;
+            }
+
+            // Case when reading from (HL)
+            if source_register == 0x06{
+                self.registers.set_register_by_index(destination_register, self.mmu.read_byte(self.registers.hl()));
+            }
+            // Case when writing to (HL)
+            if destination_register == 0x06{
+                self.mmu.write_byte(self.registers.hl(), self.registers.get_register_by_index(source_register))
+            }
+
+            self.registers.set_register_by_index(destination_register, self.registers.get_register_by_index(source_register));
+        }
+        return 1;
+    }
+
+    fn alu_ccf(&mut self){
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+
+        self.registers.set_flags(CpuFlags::C, !self.registers.get_flag(CpuFlags::C));
+    }
+
     fn alu_cpl(&mut self){
         self.registers.a = !self.registers.a;
 
@@ -209,7 +268,7 @@ impl CPU{
     fn calculate_jr_address(&mut self) -> u16{
         let mut pc = self.registers.pc as u32 as i32;
 
-        pc += (self.fetch_byte() as i8 as i32);
+        pc += self.fetch_byte() as i8 as i32;
         return pc as u16;
     }
 
