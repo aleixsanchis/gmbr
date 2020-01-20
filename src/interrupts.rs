@@ -16,13 +16,13 @@ impl Interrupts{
     pub fn set_interrupt_flag(&mut self, value: u8){
         self.interrupt_flag = value;
     }
-    pub fn get_interrupt_flag(&mut self) -> u8{
+    pub fn get_interrupt_flag(& self) -> u8{
         return self.interrupt_flag;
     }
     pub fn set_interrupt_enable(&mut self, value: u8){
         self.interrupt_enable = value;
     }
-    pub fn get_interrupt_enable(&mut self) -> u8{
+    pub fn get_interrupt_enable(& self) -> u8{
         return self.interrupt_enable;
     }
 }
