@@ -1,5 +1,6 @@
 use crate::mbc::MBC;
 use crate::gpu::GPU;
+use crate::interrupts::Interrupts;
 use std::path::PathBuf;
 
 
@@ -18,11 +19,15 @@ const HRAM_START: usize = 0xFF80;
 const HRAM_END : usize = 0xFFFE;
 const HRAM_SIZE : usize = (HRAM_END - HRAM_START)+1;
 
+const IE : usize = 0xFF0F;
+const IF : usize = 0xFFFF;
+
 pub struct MMU{
     mbc: Box<dyn MBC>,
     ram: [u8; RAM_SIZE],
     high_ram: [u8; HRAM_SIZE],
     pub gpu: GPU,
+    pub interrupts: Interrupts,
 }
 
 impl MMU{
@@ -32,6 +37,7 @@ impl MMU{
             ram: [0; RAM_SIZE as usize],
             high_ram: [0; HRAM_SIZE as usize],
             gpu: GPU::new(),
+            interrupts: Interrupts::new(),
         }
     }
     pub fn read_byte(&self, address: u16) -> u8{
@@ -41,6 +47,10 @@ impl MMU{
             RAM_START..=RAM_END => return self.ram[(address as usize - RAM_START)],
 
             HRAM_START..=HRAM_END => return self.high_ram[(address as usize - HRAM_START)],
+
+            IF => self.interrupts.get_interrupt_flag(),
+            IE => self.interrupts.get_interrupt_enable(),
+            
             _ => panic!("This memory section is not supported yet. The location was {:#6X}", address),
 
         }
@@ -56,6 +66,11 @@ impl MMU{
             RAM_START..=RAM_END => self.ram[(address as usize - RAM_START)] = value,
 
             HRAM_START..=HRAM_END => self.high_ram[(address as usize - HRAM_START)] = value,
+
+            IF => self.interrupts.set_interrupt_flag(value),
+            IE => self.interrupts.set_interrupt_enable(value),
+
+
             _ => panic!("This memory section is not supported yet. The location was {:#6X}", address),
 
         }

@@ -10,3 +10,4 @@ mod mmu;
 mod mbc;
 mod mbc0;
 mod gpu;
+mod interrupts;

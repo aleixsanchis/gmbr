@@ -1,6 +1,10 @@
 use crate::registers::CpuFlags;
 use crate::registers::Registers;
 use crate::mmu::MMU;
+use serde_json::*;
+extern crate hex;
+use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 
 pub struct CPU{
@@ -33,7 +37,9 @@ impl CPU{
         let instruction : u8 = self.mmu.read_byte(self.registers.pc);
         self.registers.pc+=1;
         let cycles = self.execute_instruction(instruction);
-
+        // if cycles == 0 {
+        //     panic!("should never gotten here...");
+        // }
         return cycles;
     }
 
@@ -89,7 +95,7 @@ impl CPU{
             // RRCA
             0x0F => {self.registers.a = self.alu_rrca(self.registers.a); 1},
             // STOP TODO
-            0x10 => {(); 1},
+            0x10 => {(handle_unimplemented_instruction(instruction, false)); 1},
             // LD DE, d16
             0x11 => {let value = self.fetch_word(); self.registers.setde(value); 3},
             // LD (DE), A
@@ -135,7 +141,7 @@ impl CPU{
             // LD H, d8
             0x26 => {self.registers.h = self.fetch_byte(); 2},
             // DAA TODO
-            0x27 => {(); 1},
+            0x27 => {(handle_unimplemented_instruction(instruction, false)); 1},
             // JR Z, r8
             0x28 => {let took_jump = self.jr_if_flag(CpuFlags::Z); took_jump},
             // ADD HL, HL
@@ -167,7 +173,7 @@ impl CPU{
             // LD (HL), d8
             0x36 => {let immediate = self.fetch_byte(); self.mmu.write_byte(self.registers.hl(), immediate); 3},
             // SCF TODO
-            0x37 => {0},
+            0x37 => {handle_unimplemented_instruction(instruction, false)},
             // JR C, r8
             0x38 => {let took_jump = self.jr_if_flag(CpuFlags::C); took_jump},
             // ADD HL, SP
@@ -187,8 +193,11 @@ impl CPU{
             // Register Movements
             0x40..=0x75 => {self.register_movement(instruction)},
             // HALT TODO
-            0x76 => {0},
+            0x76 => {handle_unimplemented_instruction(instruction, false)},
+            // More Register Movements
             0x77..=0x7F => {self.register_movement(instruction)},
+            // ADD A, Reg
+            0x80..=0x87 => {self.alu_add8(instruction)}
             // XOR A
             0xAF => {self.registers.a = self.alu_xor(self.registers.a); 1},
             // JP a16
@@ -200,9 +209,10 @@ impl CPU{
             // LDH A, (a8)
             0xF0 => {let immediate = self.fetch_byte(); self.registers.a = self.mmu.read_byte(0xFF00 + immediate as u16); 3},
             // DI TODO
-            0xF3 => {0},
-            _ => {panic!("Instruction 0x{:2X} not implemented!\n
-            {:#4X?}", instruction, self.registers);},
+            0xF3 => {0},//handle_unimplemented_instruction(instruction, false)},
+            _ => {handle_unimplemented_instruction(instruction, false); 0}
+                /*panic!("Instruction 0x{:2X} not implemented!\n
+            {:#4X?}", instruction, self.registers);},*/
         }
     }
 
@@ -228,24 +238,56 @@ impl CPU{
         }
     }
 
+    fn alu_add8(&mut self, opcode: u8) -> u8{
+        let source_register = parse_source_register_index_index(opcode);
+        let mut return_value = 1;
+        let operand;
+        if source_register == 0x06{
+            operand = self.get_byte_at_hl();
+            return_value += 1;
+        }
+        else{
+            operand = self.registers.get_register_by_index(source_register);
+        }
+        self.registers.a = self.registers.a.wrapping_add(operand);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_add8(self.registers.a, operand));
+        self.registers.set_flags(CpuFlags::C, is_carry_add8(self.registers.a, operand));
+        self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+        
+        return return_value;
+    }
+
+
+    fn alu_add16(&mut self, a: u16, b: u16) -> u16{
+        let sum = a.wrapping_add(b);
+
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_add16(a, b));
+        self.registers.set_flags(CpuFlags::C, is_carry_add16(a,b));
+        return sum;
+    }
+
     fn register_movement(&mut self, opcode: u8) -> u8{
-        if opcode & 0x40 == 0x40{
-            let destination_register = ( ( ((opcode & 0xF0) >> 4) - 0x04) * 2) + ((opcode & 0x08) >> 3);
-            let source_register = opcode & 0x07;
+        let destination_register = parse_destination_register(opcode);
+        let source_register = parse_source_register_index_index(opcode);
 
-            if destination_register == source_register {
-                return 1;
-            }
+        if destination_register == source_register {
+            return 1;
+        }
 
-            // Case when reading from (HL)
-            if source_register == 0x06{
-                self.registers.set_register_by_index(destination_register, self.mmu.read_byte(self.registers.hl()));
-            }
-            // Case when writing to (HL)
-            if destination_register == 0x06{
-                self.mmu.write_byte(self.registers.hl(), self.registers.get_register_by_index(source_register))
-            }
+        // Case when reading from (HL)
+        if source_register == 0x06{
+            self.registers.set_register_by_index(destination_register, self.mmu.read_byte(self.registers.hl()));
+            return 2;
+        }
+        // Case when writing to (HL)
+        else if destination_register == 0x06{
+            self.mmu.write_byte(self.registers.hl(), self.registers.get_register_by_index(source_register));
+            return 2;
+        }
 
+        else {
             self.registers.set_register_by_index(destination_register, self.registers.get_register_by_index(source_register));
         }
         return 1;
@@ -363,18 +405,26 @@ impl CPU{
         return r_value;
     }
 
-    fn alu_add16(&mut self, a: u16, b: u16) -> u16{
-        let sum = a.wrapping_add(b);
-
-        self.registers.set_flags(CpuFlags::N, false);
-        self.registers.set_flags(CpuFlags::H, is_half_carry_add16(a, b));
-        self.registers.set_flags(CpuFlags::C, is_carry_add16(a,b));
-        return sum;
+    fn get_word_at_hl(&mut self) -> u16{
+        return self.mmu.read_word(self.registers.hl());
+    }
+    fn get_byte_at_hl(&mut self) -> u8{
+        return self.mmu.read_byte(self.registers.hl());
+    }
+    fn set_word_at_hl(&mut self, value: u16) {
+        return self.mmu.write_word(self.registers.hl(), value);
+    }
+    fn set_byte_at_hl(&mut self, value: u8){
+        return self.mmu.write_byte(self.registers.hl(), value);
     }
 }
 
 fn is_carry_add16(a: u16, b: u16) -> bool{
     return a > (0xFFFF - b);
+}
+
+fn is_carry_add8(a: u8, b: u8) -> bool{
+    return a > (0xFF - b);
 }
 
 fn is_half_carry_add16(a: u16, value: u16) -> bool{
@@ -387,4 +437,34 @@ fn is_half_carry_add8(a: u8, value: u8) -> bool{
 
 fn is_half_carry_sub8(a: u8, value: u8) -> bool{
     return ((a & 0xF) as i8 - (value & 0xF) as i8) < 0;
+}
+
+fn parse_destination_register(opcode: u8) -> u8{
+    return ( ( ((opcode & 0xF0) >> 4) - 0x04) * 2) + ((opcode & 0x08) >> 3);
+}
+
+fn parse_source_register_index_index(opcode: u8) -> u8{
+    return opcode & 0x07;
+}
+
+fn handle_unimplemented_instruction(opcode: u8, prefixed: bool) -> u8{
+    let file = File::open("resources/opcodes.json").unwrap();
+    let opcodes : serde_json::Value = serde_json::from_reader(file).unwrap();
+    let final_opcodes;
+    
+    if prefixed{
+        final_opcodes = opcodes.get("prefixed").unwrap();   
+    }
+    else{
+        final_opcodes = opcodes.get("unprefixed").unwrap();
+    }
+    let mut encoded_opcode = hex::encode(vec![opcode]);
+    if encoded_opcode.starts_with("0"){
+        encoded_opcode.remove(0);
+    }
+    let formatted_opcode = format!("0x{}", encoded_opcode);
+    let missing_opcode = final_opcodes.get(formatted_opcode).unwrap();
+    panic!("Opcode Not implemented: {}, which corresponds to {} {}, {}", missing_opcode.get("addr").unwrap(), 
+        missing_opcode.get("mnemonic").unwrap(), missing_opcode.get("operand1").unwrap_or(&json!({"":""})), missing_opcode.get("operand2").unwrap_or(&json!({"":""})));
+    return 0;
 }

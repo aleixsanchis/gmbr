@@ -38,7 +38,7 @@ impl mbc::MBC for MBC0{
         println!("Opening the game {:#?}", game_title);
         match header[0x47]{
             0x00 => {println!("The game uses no MBC, so it's supported. Continuing...");}
-            _ => {panic!("This game uses an unsupported MBC! Closing the emulator...")}
+            _ => {panic!("This game uses an unsupported MBC (MBC{}) Closing the emulator...", header[0x47])}
         }
         //Rom size is indicated in byte 0x148
         let rom_size : usize = 32768 << header[0x48];
