@@ -6,10 +6,17 @@ extern crate hex;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use crate::interrupt_controller::InterruptController;
+use crate::gpu::GPU;
+use crate::link_cable::LinkCable;
+use crate::memory_map::*;
 
 pub struct CPU{
     registers: Registers,
     mmu: MMU,
+    interrupt_controller: InterruptController,
+    gpu: GPU,
+    link_cable: LinkCable,
 }
 pub enum MBCType{
     MBC0,
@@ -20,6 +27,9 @@ impl CPU{
         CPU{
             registers: Registers::new(),
             mmu: MMU::new(),
+            interrupt_controller: InterruptController::new(),
+            gpu: GPU::new(),
+            link_cable: LinkCable::new(),
         }
     }
 
@@ -34,7 +44,7 @@ impl CPU{
     }
 
     pub fn do_cycle(&mut self) -> u8 {
-        let instruction : u8 = self.mmu.read_byte(self.registers.pc);
+        let instruction : u8 = self.read_byte(self.registers.pc);
         self.registers.pc+=1;
         let cycles = self.execute_instruction(instruction);
         // if cycles == 0 {
@@ -43,18 +53,18 @@ impl CPU{
         return cycles;
     }
 
-    pub fn print_debug_info(&self){
+    pub fn print_registers(&self){
         println!("{:#4X?}", self.registers);
     }
 
     fn fetch_word(&mut self) -> u16{
-        let word = self.mmu.read_word(self.registers.pc);
+        let word = self.read_word(self.registers.pc);
         self.registers.pc+=2;
         return word;
     }
     
     fn fetch_byte(&mut self) -> u8{
-        let byte = self.mmu.read_byte(self.registers.pc);
+        let byte = self.read_byte(self.registers.pc);
         self.registers.pc+=1;
         return byte;
     }
@@ -67,7 +77,7 @@ impl CPU{
             // LD BC, d16
             0x01 => {let value = self.fetch_word(); self.registers.setbc(value); 3},
             // LD (BC), A
-            0x02 => {self.mmu.write_byte(self.registers.bc(), self.registers.a); 2},
+            0x02 => {self.write_byte(self.registers.bc(), self.registers.a); 2},
             // INC BC
             0x03 => {self.registers.setbc(self.registers.bc().wrapping_add(1)); 2},
             // INC B
@@ -79,11 +89,11 @@ impl CPU{
             // RLCA
             0x07 => {self.registers.a = self.alu_rlca(self.registers.a); 1},
             // LD (a16), SP
-            0x08 => {let value = self.fetch_word(); self.mmu.write_word(value, self.registers.sp); 5},
+            0x08 => {let value = self.fetch_word(); self.write_word(value, self.registers.sp); 5},
             // ADD HL,BC
             0x09 => {let value = self.alu_add16(self.registers.hl(), self.registers.bc()); self.registers.sethl(value); 2},
             // LD A, (BC)
-            0x0A => {self.registers.a = self.mmu.read_byte(self.registers.bc()); 2},
+            0x0A => {self.registers.a = self.read_byte(self.registers.bc()); 2},
             // DEC BC
             0x0B => {self.registers.setbc(self.registers.bc().wrapping_sub(1)); 2},
             // INC C
@@ -99,7 +109,7 @@ impl CPU{
             // LD DE, d16
             0x11 => {let value = self.fetch_word(); self.registers.setde(value); 3},
             // LD (DE), A
-            0x12 => {self.mmu.write_byte(self.registers.de(), self.registers.a); 2},
+            0x12 => {self.write_byte(self.registers.de(), self.registers.a); 2},
             // INC DE
             0x13 => {self.registers.setde(self.registers.de().wrapping_add(1)); 2},
             // INC D
@@ -115,7 +125,7 @@ impl CPU{
             // ADD HL, DE
             0x19 => {let value = self.alu_add16(self.registers.hl(), self.registers.de()); self.registers.sethl(value); 2},
             // LD A, (DE)
-            0x1A => {self.registers.a = self.mmu.read_byte(self.registers.de()); 2},
+            0x1A => {self.registers.a = self.read_byte(self.registers.de()); 2},
             // DEC DE
             0x1B => {self.registers.setde(self.registers.de().wrapping_sub(1)); 2},
             // INC E
@@ -131,7 +141,7 @@ impl CPU{
             // LD HL, d16
             0x21 => {let value = self.fetch_word(); self.registers.sethl(value); 3},
             // LD (HL+), A
-            0x22 => {self.mmu.write_byte(self.registers.hl_and_inc(), self.registers.a);2},
+            0x22 => {let hl = self.registers.hl_and_inc(); self.write_byte(hl, self.registers.a);2},
             // INC HL
             0x23 => {self.registers.increment_hl(); 2},
             // INC H
@@ -147,7 +157,7 @@ impl CPU{
             // ADD HL, HL
             0x29 => {let value = self.alu_add16(self.registers.hl(), self.registers.hl()); self.registers.sethl(value); 2},
             // LD A, (HL+)
-            0x2A => {self.registers.a = self.mmu.read_byte(self.registers.hl_and_inc()); 2}
+            0x2A => {let hl = self.registers.hl_and_inc(); self.registers.a = self.read_byte(hl); 2}
             // DEC HL
             0x2B => {self.registers.decrement_hl(); 2},
             // INC L
@@ -163,15 +173,15 @@ impl CPU{
             // LD SP, d16
             0x31 => {let value = self.fetch_word(); self.registers.sp = value; 3}
             // LD (HL-), A
-            0x32 => {self.mmu.write_byte(self.registers.hl_and_dec(), self.registers.a);2},
+            0x32 => {let hl = self.registers.hl_and_dec(); self.write_byte(hl, self.registers.a);2},
             // INC SP
             0x33 => {self.registers.sp = self.registers.sp.wrapping_add(1); 2},
             // INC (HL)
-            0x34 => {let mut value = self.mmu.read_byte(self.registers.hl()); value = self.alu_inc(value); self.mmu.write_byte(self.registers.hl(), value); 3},
+            0x34 => {let mut value = self.read_byte(self.registers.hl()); value = self.alu_inc(value); self.write_byte(self.registers.hl(), value); 3},
             // DEC (HL)
-            0x35 => {let mut value = self.mmu.read_byte(self.registers.hl()); value = self.alu_dec(value); self.mmu.write_byte(self.registers.hl(), value); 3},
+            0x35 => {let mut value = self.read_byte(self.registers.hl()); value = self.alu_dec(value); self.write_byte(self.registers.hl(), value); 3},
             // LD (HL), d8
-            0x36 => {let immediate = self.fetch_byte(); self.mmu.write_byte(self.registers.hl(), immediate); 3},
+            0x36 => {let immediate = self.fetch_byte(); self.write_byte(self.registers.hl(), immediate); 3},
             // SCF TODO
             0x37 => {handle_unimplemented_instruction(instruction, false)},
             // JR C, r8
@@ -179,7 +189,7 @@ impl CPU{
             // ADD HL, SP
             0x39 => {let value = self.alu_add16(self.registers.hl(), self.registers.sp); self.registers.sethl(value); 2},
             // LD A, (HL-)
-            0x3A => {self.registers.a = self.mmu.read_byte(self.registers.hl_and_dec()); 2},
+            0x3A => {let hl = self.registers.hl_and_dec(); self.registers.a = self.read_byte(hl); 2},
             // DEC SP
             0x3B => {self.registers.sp = self.registers.sp.wrapping_sub(1); 2},
             // INC A
@@ -204,12 +214,13 @@ impl CPU{
             0xC3 => {let address = self.fetch_word(); self.jump_to(address); 4},
 
             // LDH (a8), A
-            0xE0 => {let immediate = self.fetch_byte(); self.mmu.write_byte(0xFF00 + immediate as u16, self.registers.a); 3},
-
+            0xE0 => {let immediate = self.fetch_byte(); self.write_byte(0xFF00 + immediate as u16, self.registers.a); 3},
             // LDH A, (a8)
-            0xF0 => {let immediate = self.fetch_byte(); self.registers.a = self.mmu.read_byte(0xFF00 + immediate as u16); 3},
-            // DI TODO
-            0xF3 => {0},//handle_unimplemented_instruction(instruction, false)},
+            0xF0 => {let immediate = self.fetch_byte(); self.registers.a = self.read_byte(0xFF00 + immediate as u16); 3},
+            // DI
+            0xF3 => {self.interrupt_controller.disable_master_interrupt(); 1},
+            // EI
+            0xFB => {self.interrupt_controller.enable_master_interrupt(); 1},
             _ => {handle_unimplemented_instruction(instruction, false); 0}
                 /*panic!("Instruction 0x{:2X} not implemented!\n
             {:#4X?}", instruction, self.registers);},*/
@@ -278,12 +289,12 @@ impl CPU{
 
         // Case when reading from (HL)
         if source_register == 0x06{
-            self.registers.set_register_by_index(destination_register, self.mmu.read_byte(self.registers.hl()));
+            self.registers.set_register_by_index(destination_register, self.read_byte(self.registers.hl()));
             return 2;
         }
         // Case when writing to (HL)
         else if destination_register == 0x06{
-            self.mmu.write_byte(self.registers.hl(), self.registers.get_register_by_index(source_register));
+            self.write_byte(self.registers.hl(), self.registers.get_register_by_index(source_register));
             return 2;
         }
 
@@ -406,16 +417,47 @@ impl CPU{
     }
 
     fn get_word_at_hl(&mut self) -> u16{
-        return self.mmu.read_word(self.registers.hl());
+        return self.read_word(self.registers.hl());
     }
     fn get_byte_at_hl(&mut self) -> u8{
-        return self.mmu.read_byte(self.registers.hl());
+        return self.read_byte(self.registers.hl());
     }
     fn set_word_at_hl(&mut self, value: u16) {
-        return self.mmu.write_word(self.registers.hl(), value);
+        return self.write_word(self.registers.hl(), value);
     }
     fn set_byte_at_hl(&mut self, value: u8){
-        return self.mmu.write_byte(self.registers.hl(), value);
+        return self.write_byte(self.registers.hl(), value);
+    }
+    
+    fn write_byte(&mut self, address: u16, value: u8){
+        match address as usize{
+            IF => self.interrupt_controller.set_interrupt_flag(value),
+            IE => self.interrupt_controller.set_interrupt_enable(value),
+            VRAM_START..=VRAM_END => self.gpu.vram[address as usize - VRAM_START] = value,
+            LCDC => self.gpu.set_lcdc(value),
+            SCY => self.gpu.set_scy(value),
+            SCX => self.gpu.set_scx(value),
+            SB => self.link_cable.set_sb(value),
+            SC => self.link_cable.set_sc(value),
+            _ => self.mmu.write_byte(address, value),
+        }
+    }
+    
+
+    fn write_word(&mut self, address: u16, value: u16){
+        self.write_byte(address, (value & 0xFF) as u8);
+        self.write_byte(address + 1, (value >> 8) as u8);
+    }
+
+    fn read_byte(& self, address: u16) -> u8{
+        match address as usize{
+            VRAM_START..=VRAM_END => return self.gpu.vram[address as usize - VRAM_START],
+            _ => return self.mmu.read_byte(address),
+        }
+    }
+
+    fn read_word(& self, address: u16) -> u16{
+        return (self.read_byte(address) as u16) | ((self.read_byte(address + 1) as u16) << 8);
     }
 }
 

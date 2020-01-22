@@ -44,7 +44,7 @@ impl mbc::MBC for MBC0{
         let rom_size : usize = 32768 << header[0x48];
         assert_eq!(self.rom.len(), rom_size, "The ROM size reported by the header and the ROM file size don't match. Maybe the file is corrupted. Closing the emulator...");
         if header[0x49] != 0 {
-            panic!("RAM not implemented yet! Closing the emulator...")
+            panic!("External RAM not implemented yet! Closing the emulator...")
         }
     }
 }

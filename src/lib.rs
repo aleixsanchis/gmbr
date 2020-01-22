@@ -10,4 +10,6 @@ mod mmu;
 mod mbc;
 mod mbc0;
 mod gpu;
-mod interrupts;
+mod interrupt_controller;
+mod memory_map;
+mod link_cable;

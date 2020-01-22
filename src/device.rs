@@ -19,7 +19,7 @@ impl Device{
         loop{
             let cycles_elapsed = self.cpu.do_cycle();
             if debug_mode {
-                self.cpu.print_debug_info();
+                self.cpu.print_registers();
                 cli::read_any_key();
             }
             //Interruptions, video sound etc.
