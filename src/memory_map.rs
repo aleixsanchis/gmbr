@@ -13,9 +13,18 @@ pub const HRAM_END : usize = 0xFFFE;
 // IO REGISTERS
 
 // VIDEO
-pub const LCDC : usize = 0xFF41;
+pub const LCDC : usize = 0xFF40;
+pub const STAT : usize = 0xFF41;
 pub const SCY : usize = 0xFF42;
 pub const SCX : usize = 0xFF43;
+pub const LY : usize = 0xFF44;
+pub const LYC : usize = 0xFF45;
+pub const DMA : usize = 0xFF46;
+pub const BGP : usize = 0xFF47;
+pub const OBP0 : usize = 0xFF48;
+pub const OBP1: usize = 0xFF49;
+pub const WY : usize = 0xFF4A;
+pub const WX : usize = 0xFF4B;
 
 // INTERRUPTS
 pub const IE : usize = 0xFF0F;

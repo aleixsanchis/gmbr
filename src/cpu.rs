@@ -221,6 +221,8 @@ impl CPU{
             0xF3 => {self.interrupt_controller.disable_master_interrupt(); 1},
             // EI
             0xFB => {self.interrupt_controller.enable_master_interrupt(); 1},
+            // CP, d8
+            0xFE => {let value = self.fetch_byte(); self.alu_cp(value); 2},
             _ => {handle_unimplemented_instruction(instruction, false); 0}
                 /*panic!("Instruction 0x{:2X} not implemented!\n
             {:#4X?}", instruction, self.registers);},*/
@@ -416,6 +418,20 @@ impl CPU{
         return r_value;
     }
 
+    fn alu_cp(&mut self, value: u8){
+        self.alu_sub(value);
+    }
+
+    fn alu_sub(&mut self, value: u8) -> u8{
+        let result = self.registers.a.wrapping_sub(value);
+
+        self.registers.set_flags(CpuFlags::Z, result==0);
+        self.registers.set_flags(CpuFlags::N, true);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_sub8(self.registers.a, value));
+        self.registers.set_flags(CpuFlags::C, self.registers.a < value);
+        return result;
+    }
+
     fn get_word_at_hl(&mut self) -> u16{
         return self.read_word(self.registers.hl());
     }
@@ -431,18 +447,22 @@ impl CPU{
     
     fn write_byte(&mut self, address: u16, value: u8){
         match address as usize{
-            IF => self.interrupt_controller.set_interrupt_flag(value),
-            IE => self.interrupt_controller.set_interrupt_enable(value),
+            
             VRAM_START..=VRAM_END => self.gpu.vram[address as usize - VRAM_START] = value,
             LCDC => self.gpu.set_lcdc(value),
+            STAT => self.gpu.set_stat(value),
             SCY => self.gpu.set_scy(value),
             SCX => self.gpu.set_scx(value),
+            LYC => self.gpu.set_lyc(value),
             SB => self.link_cable.set_sb(value),
             SC => self.link_cable.set_sc(value),
+
+            IF => self.interrupt_controller.set_interrupt_flag(value),
+            IE => self.interrupt_controller.set_interrupt_enable(value),
             _ => self.mmu.write_byte(address, value),
         }
     }
-    
+
 
     fn write_word(&mut self, address: u16, value: u16){
         self.write_byte(address, (value & 0xFF) as u8);
@@ -452,6 +472,8 @@ impl CPU{
     fn read_byte(& self, address: u16) -> u8{
         match address as usize{
             VRAM_START..=VRAM_END => return self.gpu.vram[address as usize - VRAM_START],
+            STAT => self.gpu.stat(),
+            LY => self.gpu.ly(),
             _ => return self.mmu.read_byte(address),
         }
     }
@@ -461,20 +483,20 @@ impl CPU{
     }
 }
 
-fn is_carry_add16(a: u16, b: u16) -> bool{
-    return a > (0xFFFF - b);
-}
-
 fn is_carry_add8(a: u8, b: u8) -> bool{
     return a > (0xFF - b);
 }
 
-fn is_half_carry_add16(a: u16, value: u16) -> bool{
-    return ((a & 0x07FF) + (value & 0x07FF)) > 0x07F0;
+fn is_carry_add16(a: u16, b: u16) -> bool{
+    return a > (0xFFFF - b);
 }
 
 fn is_half_carry_add8(a: u8, value: u8) -> bool{
     return (((a & 0x0F) + (value & 0x0F)) & 0x10) == 0x10;
+}
+
+fn is_half_carry_add16(a: u16, value: u16) -> bool{
+    return ((a & 0x07FF) + (value & 0x07FF)) > 0x07F0;
 }
 
 fn is_half_carry_sub8(a: u8, value: u8) -> bool{
