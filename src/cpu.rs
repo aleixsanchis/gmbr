@@ -15,7 +15,7 @@ pub struct CPU{
     registers: Registers,
     mmu: MMU,
     interrupt_controller: InterruptController,
-    gpu: GPU,
+    pub gpu: GPU,
     link_cable: LinkCable,
 }
 pub enum MBCType{

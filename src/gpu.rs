@@ -1,20 +1,33 @@
-use luminance_glfw::{Action, GlfwSurface, Key, Surface as _, WindowDim, WindowEvent, WindowOpt};
 const VRAM_SIZE : usize = 0x2000;
 pub struct GPU{
     pub vram: [u8; VRAM_SIZE],
+    mode_counter: u32,
+    line: u8,
+    mode: GPU_modes,
+
     scy: u8,
     scx: u8,
     stat: u8,
     lcdc: u8,
     ly: u8,
     lyc: u8,
+}
 
+enum GPU_modes{
+    OAMSearch,
+    ActivePicture,
+    HBlank,
+    VBlank,
 }
 
 impl GPU{
     pub fn new() -> GPU{
         GPU{
             vram: [0; VRAM_SIZE],
+            mode_counter: 0,
+            line: 0,
+            mode: GPU_modes::OAMSearch,
+
             lcdc: 0,
             stat: 0,
             scy : 0,
@@ -22,6 +35,62 @@ impl GPU{
             ly: 0,
             lyc: 0,
         }
+    }
+
+    pub fn update_scanlines(&mut self, cycles: u8){
+        if !self.lcd_on() {
+            return;
+        }
+
+        let mut dots_left = cycles;
+
+        while dots_left > 0 {
+            let iteration_dots;
+
+            if dots_left >= 80 {
+                iteration_dots = 80;
+            }
+            else {
+                iteration_dots = dots_left;
+            }
+
+            self.mode_counter += iteration_dots as u32;
+            dots_left -= iteration_dots;
+
+            // We finished a line (114 cpu cycles or 456 dots)
+            if self.mode_counter >= 456 {
+                self.mode_counter -= 456;
+                // 144 lines + 10 of VBLANK
+                self.line = self.line + 1;
+                if self.line == 154 {
+                    self.line = 0;
+                }
+
+                if self.line >= 144 {
+                    self.mode = GPU_modes::VBlank;
+                }
+            }
+
+        }
+    }
+
+    fn check_lyc_interrupt(&mut self){
+        if self.lyc == self.line {
+            // TODO Raise interrupt LYC
+        }
+    }
+    fn change_mode(&mut self, new_mode: GPU_modes){
+        self.mode = new_mode;
+        match self.mode {
+            // TODO 
+            GPU_modes::VBlank => {},
+            _ => {},
+        }
+
+    }
+
+    fn lcd_on(&self) -> bool{
+        return self.lcdc & 0x80 == 0x80;
     }
 
     pub fn set_lcdc(&mut self, value: u8){
