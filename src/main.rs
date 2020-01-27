@@ -2,7 +2,6 @@
 
 extern crate config;
 
-
 use gmbr::device::Device;
 
 

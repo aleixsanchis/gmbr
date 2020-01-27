@@ -1,6 +1,6 @@
+extern crate sdl2;
+
 use crate::cpu::CPU;
-use luminance_glfw::{Action, GlfwSurface, Key, Surface as _, WindowDim, WindowEvent, WindowOpt};
-use luminance::context::GraphicsContext as _;
 
 use std::path::PathBuf;
 use std::time::{Duration,Instant};
@@ -9,7 +9,6 @@ use crate::cli;
 use crate::interrupt_controller::InterruptFlags;
 pub struct Device{
     cpu: CPU,
-    surface: GlfwSurface,
 }
 
 
@@ -18,10 +17,10 @@ impl Device{
     pub fn new() -> Device{
         Device{
             cpu: CPU::new(),
-            surface : GlfwSurface::new(WindowDim::Windowed(640, 576), "GMBR Emulator", WindowOpt::default()).unwrap(),
         }
     }
     pub fn run(&mut self) -> () {
+        let _sdl = sdl2::init().unwrap();
         let debug_mode : bool = false;
         let cycles_per_frame : u32 = 69905;
         loop{
@@ -48,17 +47,8 @@ impl Device{
                 }
 
                 // User input
-                for event in self.surface.poll_events() {
-                    match event {
-                        WindowEvent::Close | WindowEvent::Key(Key::Escape, _, Action::Release, _) => {
-                            std::process::exit(0);
-                        }
-                        _ => {}
-                    }
-                }
             }
 
-            self.surface.swap_buffers();
 
             let time_spent = now.elapsed().as_millis();
             if time_spent < 16{
