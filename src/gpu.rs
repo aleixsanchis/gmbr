@@ -1,18 +1,26 @@
 const VRAM_SIZE : usize = 0x2000;
+const LYC_INTERRUPT_ENABLED : u8 = 0b0100_0000;
+const OAM_INTERRUPT_ENABLED : u8 = 0b0010_0000;
+const VBLANK_INTERRUPT_ENABLED : u8 = 0b001_0000;
+const HBLANK_INTERRUPT_ENABLED : u8 = 0b0000_1000;
+
 pub struct GPU{
     pub vram: [u8; VRAM_SIZE],
     mode_counter: u32,
     line: u8,
     mode: GPU_modes,
+    pub vblank_interrupt_req: bool,
+    pub stat_interrupt_req: bool,
 
     scy: u8,
     scx: u8,
     stat: u8,
     lcdc: u8,
-    ly: u8,
+    //ly: u8,
     lyc: u8,
 }
 
+#[derive(PartialEq)]
 enum GPU_modes{
     OAMSearch,
     ActivePicture,
@@ -27,12 +35,15 @@ impl GPU{
             mode_counter: 0,
             line: 0,
             mode: GPU_modes::OAMSearch,
+            vblank_interrupt_req : false,
+            stat_interrupt_req : false,
+
 
             lcdc: 0,
             stat: 0,
             scy : 0,
             scx : 0,
-            ly: 0,
+            //ly: 0,
             lyc: 0,
         }
     }
@@ -66,31 +77,64 @@ impl GPU{
                     self.line = 0;
                 }
 
-                if self.line >= 144 {
-                    self.mode = GPU_modes::VBlank;
-                }
+                self.check_lyc_interrupt();
             }
 
-        }
-    }
+            if self.line >= 144 && self.mode != GPU_modes::VBlank{
+                self.change_mode(GPU_modes::VBlank)
+            }
 
-    fn check_lyc_interrupt(&mut self){
-        if self.lyc == self.line {
-            // TODO Raise interrupt LYC
+            else if self.line < 144 {
+                if self.mode_counter <= 80 && self.mode != GPU_modes::OAMSearch {
+                    self.change_mode(GPU_modes::OAMSearch);
+                }
+                // TODO maybe actually use the correct value based on window and scrolling register
+                else if self.mode_counter <= 252 && self.mode != GPU_modes::ActivePicture {
+                    self.change_mode(GPU_modes::ActivePicture);
+                }
+                else{
+                    self.change_mode(GPU_modes::HBlank);
+                }
+            }
         }
-    }
-    fn change_mode(&mut self, new_mode: GPU_modes){
-        self.mode = new_mode;
-        match self.mode {
-            // TODO 
-            GPU_modes::VBlank => {},
-            _ => {},
-        }
-
     }
 
     fn lcd_on(&self) -> bool{
         return self.lcdc & 0x80 == 0x80;
+    }
+
+    fn lyc_interrupt_enabled(&self) -> bool{
+        return self.stat & LYC_INTERRUPT_ENABLED == LYC_INTERRUPT_ENABLED;
+    }
+
+    fn check_lyc_interrupt(&mut self){
+        if self.lyc == self.line && self.lyc_interrupt_enabled() {
+            self.stat_interrupt_req = true;
+        }
+    }
+    fn change_mode(&mut self, new_mode: GPU_modes){
+        self.mode = new_mode;
+        self.stat &= 0b0111_1100;
+        match self.mode {
+            // TODO 
+            GPU_modes::VBlank => {
+                self.stat |= 0b0000_0001;
+                self.vblank_interrupt_req = true;
+            },
+
+            GPU_modes::OAMSearch => {
+                self.stat |= 0b0000_0010;
+
+            },
+
+            GPU_modes::ActivePicture => {
+                self.stat |= 0b0000_0011;
+            },
+
+            GPU_modes::HBlank => {
+            },
+        }
+
     }
 
     pub fn set_lcdc(&mut self, value: u8){
@@ -99,7 +143,9 @@ impl GPU{
 
     pub fn set_stat(&mut self, value: u8){
         // Only modifying Read/Write values
-        self.stat = value&0b01111000
+        self.stat = value&0b0111_1000
+
+
 
         // TODO Game Boy makes the LCD interrupt sometimes trigger when writing to STAT 
         // (including writing $00) during OAM scan, H-Blank, V-Blank, or LY=LYC. 
@@ -120,7 +166,7 @@ impl GPU{
     }
 
     pub fn ly(&self) -> u8{
-        return self.ly;
+        return self.line;
     }
 
     pub fn set_lyc(&mut self, value: u8){

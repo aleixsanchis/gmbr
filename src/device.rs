@@ -1,9 +1,12 @@
 use crate::cpu::CPU;
 use luminance_glfw::{Action, GlfwSurface, Key, Surface as _, WindowDim, WindowEvent, WindowOpt};
+use luminance::context::GraphicsContext as _;
+
 use std::path::PathBuf;
 use std::time::{Duration,Instant};
 use std::thread::sleep;
 use crate::cli;
+use crate::interrupt_controller::InterruptFlags;
 pub struct Device{
     cpu: CPU,
     surface: GlfwSurface,
@@ -28,11 +31,34 @@ impl Device{
                 let cycles_elapsed = self.cpu.do_cycle() * 4;
                 total_cycles += cycles_elapsed as u32;
                 self.cpu.gpu.update_scanlines(cycles_elapsed);
+
+                if self.cpu.gpu.stat_interrupt_req{
+                    self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::LCDStat);
+                    self.cpu.gpu.stat_interrupt_req = false;
+                }
+
+                if self.cpu.gpu.vblank_interrupt_req{
+                    self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::VBlank);
+                    self.cpu.gpu.vblank_interrupt_req = false;
+                }
+
                 if debug_mode {
                     self.cpu.print_registers();
-                    cli::read_any_key();
+                    //cli::read_any_key();
+                }
+
+                // User input
+                for event in self.surface.poll_events() {
+                    match event {
+                        WindowEvent::Close | WindowEvent::Key(Key::Escape, _, Action::Release, _) => {
+                            std::process::exit(0);
+                        }
+                        _ => {}
+                    }
                 }
             }
+
+            self.surface.swap_buffers();
 
             let time_spent = now.elapsed().as_millis();
             if time_spent < 16{
@@ -41,7 +67,7 @@ impl Device{
                 sleep(Duration::from_millis(time_to_sleep as u64));
             }
             else{
-                eprintln!("Falling behind... last frame took {}", time_spent);
+                eprintln!("Falling behind... last frame took {} miliseconds", time_spent);
             }
         }
 

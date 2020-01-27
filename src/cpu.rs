@@ -14,7 +14,7 @@ use crate::memory_map::*;
 pub struct CPU{
     registers: Registers,
     mmu: MMU,
-    interrupt_controller: InterruptController,
+    pub interrupt_controller: InterruptController,
     pub gpu: GPU,
     link_cable: LinkCable,
 }
@@ -457,8 +457,8 @@ impl CPU{
             SB => self.link_cable.set_sb(value),
             SC => self.link_cable.set_sc(value),
 
-            IF => self.interrupt_controller.set_interrupt_flag(value),
-            IE => self.interrupt_controller.set_interrupt_enable(value),
+            IF => self.interrupt_controller.set_iflag(value),
+            IE => self.interrupt_controller.set_ie(value),
             _ => self.mmu.write_byte(address, value),
         }
     }
