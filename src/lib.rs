@@ -13,3 +13,4 @@ mod gpu;
 mod interrupt_controller;
 mod memory_map;
 mod link_cable;
+mod joypad;

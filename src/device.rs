@@ -1,7 +1,7 @@
-extern crate sdl2;
+extern crate sfml;
 
 use crate::cpu::CPU;
-
+use sfml::window::{Window, Event, Style};
 use std::path::PathBuf;
 use std::time::{Duration,Instant};
 use std::thread::sleep;
@@ -20,9 +20,9 @@ impl Device{
         }
     }
     pub fn run(&mut self) -> () {
-        let _sdl = sdl2::init().unwrap();
         let debug_mode : bool = false;
         let cycles_per_frame : u32 = 69905;
+        let mut window = Window::new((640, 576), "GMBR Emulator", Style::CLOSE|Style::TITLEBAR, &Default::default());
         loop{
             let now = Instant::now();
             let mut total_cycles : u32 = 0;
@@ -47,9 +47,20 @@ impl Device{
                 }
 
                 // User input
+
+                while let Some(event) = window.poll_event() {
+                    
+                    match event {
+                        Event::Closed | Event::KeyPressed {code: sfml::window::Key::Escape, ..} => window.close(),
+                        _ => {},
+                    }
+                }
+                window.set_active(true);
+                    
+                
             }
 
-
+            window.display();
             let time_spent = now.elapsed().as_millis();
             if time_spent < 16{
                 let time_to_sleep = 16 - time_spent;
