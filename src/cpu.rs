@@ -10,6 +10,7 @@ use crate::interrupt_controller::InterruptController;
 use crate::gpu::GPU;
 use crate::link_cable::LinkCable;
 use crate::memory_map::*;
+use crate::joypad::*;
 
 pub struct CPU{
     registers: Registers,
@@ -17,6 +18,7 @@ pub struct CPU{
     pub interrupt_controller: InterruptController,
     pub gpu: GPU,
     link_cable: LinkCable,
+    pub joypad: Joypad,
 }
 pub enum MBCType{
     MBC0,
@@ -30,6 +32,7 @@ impl CPU{
             interrupt_controller: InterruptController::new(),
             gpu: GPU::new(),
             link_cable: LinkCable::new(),
+            joypad: Joypad::new(),
         }
     }
 
@@ -449,6 +452,8 @@ impl CPU{
         match address as usize{
             
             VRAM_START..=VRAM_END => self.gpu.vram[address as usize - VRAM_START] = value,
+
+            JOYP => self.joypad.set_joyp(value),
             LCDC => self.gpu.set_lcdc(value),
             STAT => self.gpu.set_stat(value),
             SCY => self.gpu.set_scy(value),

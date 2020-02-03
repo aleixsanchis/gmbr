@@ -12,6 +12,9 @@ pub const HRAM_END : usize = 0xFFFE;
 
 // IO REGISTERS
 
+// JOYPAD
+pub const JOYP : usize = 0xFF00;
+
 // VIDEO
 pub const LCDC : usize = 0xFF40;
 pub const STAT : usize = 0xFF41;

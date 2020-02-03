@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-#![crate_name = "gmbr"]
-#![crate_type = "lib" ]
-
-pub mod device;
-pub mod cli;
-
-mod cpu;
-mod registers;
-mod mmu;
-mod mbc;
-mod mbc0;
-mod gpu;
-mod interrupt_controller;
-mod memory_map;
-mod link_cable;
-=======
 #![crate_name = "gmbr"]
 #![crate_type = "lib" ]
 
@@ -31,4 +14,3 @@ mod interrupt_controller;
 mod memory_map;
 mod link_cable;
 mod joypad;
->>>>>>> 563abd1b5ce6eec4fd88137b319a58fc465abb8f
