@@ -11,6 +11,7 @@ use crate::gpu::GPU;
 use crate::link_cable::LinkCable;
 use crate::memory_map::*;
 use crate::joypad::*;
+use crate::apu::APU;
 
 pub struct CPU{
     registers: Registers,
@@ -19,6 +20,7 @@ pub struct CPU{
     pub gpu: GPU,
     link_cable: LinkCable,
     pub joypad: Joypad,
+    pub apu: APU,
 }
 pub enum MBCType{
     MBC0,
@@ -33,6 +35,7 @@ impl CPU{
             gpu: GPU::new(),
             link_cable: LinkCable::new(),
             joypad: Joypad::new(),
+            apu: APU::new(),
         }
     }
 
@@ -217,16 +220,18 @@ impl CPU{
             0xC3 => {let address = self.fetch_word(); self.jump_to(address); 4},
 
             // LDH (a8), A
-            0xE0 => {let immediate = self.fetch_byte(); self.write_byte(0xFF00 + immediate as u16, self.registers.a); 3},
+            0xE0 => {let address = self.fetch_byte(); self.write_byte(0xFF00 + address as u16, self.registers.a); 3},
+            // LD (a16), A
+            0xEA => {let address = self.fetch_word(); self.write_byte(address, self.registers.a); 4},
             // LDH A, (a8)
-            0xF0 => {let immediate = self.fetch_byte(); self.registers.a = self.read_byte(0xFF00 + immediate as u16); 3},
+            0xF0 => {let address = self.fetch_byte(); self.registers.a = self.read_byte(0xFF00 + address as u16); 3},
             // DI
             0xF3 => {self.interrupt_controller.disable_master_interrupt(); 1},
             // EI
             0xFB => {self.interrupt_controller.enable_master_interrupt(); 1},
             // CP, d8
             0xFE => {let value = self.fetch_byte(); self.alu_cp(value); 2},
-            _ => {handle_unimplemented_instruction(instruction, false); 0}
+            _ => {self.print_registers(); handle_unimplemented_instruction(instruction, false); 0}
                 /*panic!("Instruction 0x{:2X} not implemented!\n
             {:#4X?}", instruction, self.registers);},*/
         }
@@ -453,12 +458,19 @@ impl CPU{
             
             VRAM_START..=VRAM_END => self.gpu.vram[address as usize - VRAM_START] = value,
 
+            UNUSED_AREA_START..=UNUSED_AREA_END => {}, // Do nothing
+
             JOYP => self.joypad.set_joyp(value),
+            
+            NR10..=WPR_START => self.apu.do_nothing(),
             LCDC => self.gpu.set_lcdc(value),
             STAT => self.gpu.set_stat(value),
             SCY => self.gpu.set_scy(value),
             SCX => self.gpu.set_scx(value),
             LYC => self.gpu.set_lyc(value),
+            BGP => self.gpu.set_bgp(value),
+            OBP0 => self.gpu.set_obp0(value),
+            OBP1 => self.gpu.set_obp1(value),
             SB => self.link_cable.set_sb(value),
             SC => self.link_cable.set_sc(value),
 
@@ -477,6 +489,7 @@ impl CPU{
     fn read_byte(& self, address: u16) -> u8{
         match address as usize{
             VRAM_START..=VRAM_END => return self.gpu.vram[address as usize - VRAM_START],
+            UNUSED_AREA_START..=UNUSED_AREA_END => return 0xFF, // Default bus read
             STAT => self.gpu.stat(),
             LY => self.gpu.ly(),
             _ => return self.mmu.read_byte(address),
@@ -535,5 +548,5 @@ fn handle_unimplemented_instruction(opcode: u8, prefixed: bool) -> u8{
     let missing_opcode = final_opcodes.get(formatted_opcode).unwrap();
     panic!("Opcode Not implemented: {}, which corresponds to {} {}, {}", missing_opcode.get("addr").unwrap(), 
         missing_opcode.get("mnemonic").unwrap(), missing_opcode.get("operand1").unwrap_or(&json!({"":""})), missing_opcode.get("operand2").unwrap_or(&json!({"":""})));
-    return 0;
+        return 0;
 }

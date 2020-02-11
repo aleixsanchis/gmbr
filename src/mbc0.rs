@@ -17,8 +17,8 @@ impl mbc::MBC for MBC0{
         return (self.rom[address as usize] as u16) | ((self.rom[(address+1) as usize] as u16) << 8);
     }
     fn write_byte(&mut self, address: u16, value: u8){
-
-        self.rom[address as usize] = value;
+        // There are no write operations defined for MBC0 because we can't swap banks
+        return;//self.rom[address as usize] = value;
     }
     fn write_word(&mut self, address: u16, value: u16){
 

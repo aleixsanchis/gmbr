@@ -18,6 +18,9 @@ pub struct GPU{
     lcdc: u8,
     //ly: u8,
     lyc: u8,
+    bgp: u8,
+    obp0: u8,
+    obp1: u8,
 }
 
 #[derive(PartialEq)]
@@ -45,6 +48,9 @@ impl GPU{
             scx : 0,
             //ly: 0,
             lyc: 0,
+            bgp: 0,
+            obp0: 0,
+            obp1: 0,
         }
     }
 
@@ -171,5 +177,29 @@ impl GPU{
 
     pub fn set_lyc(&mut self, value: u8){
         self.lyc = value;
+    }
+
+    pub fn bgp(&self) -> u8{
+        return self.bgp;
+    }
+
+    pub fn set_bgp(&mut self, value: u8){
+        self.bgp = value;
+    }
+
+    pub fn obp0(&self) -> u8{
+        return self.obp0;
+    }
+
+    pub fn set_obp0(&mut self, value: u8){
+        self.obp0 = value;
+    }
+
+    pub fn obp1(&self) -> u8{
+        return self.obp1;
+    }
+
+    pub fn set_obp1(&mut self, value: u8){
+        self.obp1 = value;
     }
 }

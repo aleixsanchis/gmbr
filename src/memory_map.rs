@@ -7,6 +7,10 @@ pub const RAM_END : usize = 0xDFFF;
 pub const VRAM_START : usize = 0x8000;
 pub const VRAM_END : usize = 0x9FFF;
 
+// MISC
+pub const UNUSED_AREA_START : usize = 0xFEA0;
+pub const UNUSED_AREA_END : usize = 0xFEFF;
+
 pub const HRAM_START: usize = 0xFF80;
 pub const HRAM_END : usize = 0xFFFE;
 
@@ -14,6 +18,34 @@ pub const HRAM_END : usize = 0xFFFE;
 
 // JOYPAD
 pub const JOYP : usize = 0xFF00;
+
+// SOUND
+pub const NR10 : usize = 0xFF10;
+pub const NR11 : usize = 0xFF11;
+pub const NR12 : usize = 0xFF12;
+pub const NR13 : usize = 0xFF13;
+pub const NR14 : usize = 0xFF14;
+pub const NR16 : usize = 0xFF21;
+pub const NR17 : usize = 0xFF22;
+pub const NR18 : usize = 0xFF23;
+pub const NR19 : usize = 0xFF24;
+pub const NR30 : usize = 0xFF1A;
+pub const NR31 : usize = 0xFF1B;
+pub const NR32 : usize = 0xFF1C;
+pub const NR33 : usize = 0xFF1D;
+pub const NR34 : usize = 0xFF1E;
+pub const NR41 : usize = 0xFF20;
+pub const NR42 : usize = 0xFF21;
+pub const NR43 : usize = 0xFF22;
+pub const NR44 : usize = 0xFF23;
+pub const NR50 : usize = 0xFF24;
+pub const NR51 : usize = 0xFF25;
+pub const NR52 : usize = 0xFF26;
+pub const WPR_START : usize = 0xFF30;
+pub const WPR_END : usize = 0xFF3F;
+
+
+
 
 // VIDEO
 pub const LCDC : usize = 0xFF40;
@@ -36,4 +68,5 @@ pub const IF : usize = 0xFFFF;
 // LINK CABLE
 pub const SB : usize = 0xFF01;
 pub const SC : usize = 0xFF02; 
+
 

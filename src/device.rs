@@ -2,6 +2,7 @@ extern crate sfml;
 
 use crate::cpu::CPU;
 use sfml::window::{Window, Event, Style};
+use sfml::graphics::{RenderWindow};
 use std::path::PathBuf;
 use std::time::{Duration,Instant};
 use std::thread::sleep;
@@ -23,7 +24,7 @@ impl Device{
     pub fn run(&mut self) -> () {
         let debug_mode : bool = false;
         let cycles_per_frame : u32 = 69905;
-        let mut window = Window::new((640, 576), "GMBR Emulator", Style::CLOSE|Style::TITLEBAR, &Default::default());
+        let mut window = RenderWindow::new((640, 576), "GMBR Emulator", Style::CLOSE|Style::TITLEBAR, &Default::default());
         loop{
             let now = Instant::now();
             let mut total_cycles : u32 = 0;
