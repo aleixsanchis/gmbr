@@ -28,7 +28,7 @@ impl MMU{
             RAM_START..=RAM_END => return self.ram[(address as usize - RAM_START)],
             HRAM_START..=HRAM_END => return self.high_ram[(address as usize - HRAM_START)],
 
-            _ => panic!("Invalid Read! This memory section is not supported (yet?). The location was {:#6X}", address),
+            _ => {println!("Invalid Read! This memory section is not supported (yet?). The location was {:#6X}", address);0xFF},
 
         }
         
@@ -42,7 +42,7 @@ impl MMU{
             RAM_START..=RAM_END => self.ram[(address as usize - RAM_START)] = value,
             HRAM_START..=HRAM_END => self.high_ram[(address as usize - HRAM_START)] = value,
 
-            _ => panic!("Invalid Write! This memory section is not supported (yet?). The location was {:#6X}", address),
+            _ => println!("Invalid Write! This memory section is not supported (yet?). The location was {:#6X}", address),
 
         }
     }

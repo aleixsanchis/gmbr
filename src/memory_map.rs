@@ -7,6 +7,12 @@ pub const RAM_END : usize = 0xDFFF;
 pub const VRAM_START : usize = 0x8000;
 pub const VRAM_END : usize = 0x9FFF;
 
+pub const MIRROR_START : usize = 0xE000;
+pub const MIRROR_END : usize = 0xFDFF;
+
+pub const OAM_START : usize = 0xFE00;
+pub const OAM_END : usize = 0xFE9F;
+
 // MISC
 pub const UNUSED_AREA_START : usize = 0xFEA0;
 pub const UNUSED_AREA_END : usize = 0xFEFF;
