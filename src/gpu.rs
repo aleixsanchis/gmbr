@@ -1,4 +1,5 @@
 const VRAM_SIZE : usize = 0x2000;
+const OAM_SIZE : usize = 0xA0;
 const LYC_INTERRUPT_ENABLED : u8 = 0b0100_0000;
 const OAM_INTERRUPT_ENABLED : u8 = 0b0010_0000;
 const VBLANK_INTERRUPT_ENABLED : u8 = 0b001_0000;
@@ -6,6 +7,7 @@ const HBLANK_INTERRUPT_ENABLED : u8 = 0b0000_1000;
 
 pub struct GPU{
     pub vram: [u8; VRAM_SIZE],
+    pub oam: [u8; OAM_SIZE],
     mode_counter: u32,
     line: u8,
     mode: GPU_modes,
@@ -35,6 +37,7 @@ impl GPU{
     pub fn new() -> GPU{
         GPU{
             vram: [0; VRAM_SIZE],
+            oam: [0; OAM_SIZE],
             mode_counter: 0,
             line: 0,
             mode: GPU_modes::OAMSearch,
@@ -52,6 +55,22 @@ impl GPU{
             obp0: 0,
             obp1: 0,
         }
+    }
+
+    pub fn write_byte_vram(&mut self, address: usize, value: u8){
+        self.vram[address] = value;
+    }
+
+    pub fn write_byte_oam(&mut self, address: usize, value: u8){
+        self.oam[address] = value;
+    }
+
+    pub fn read_byte_vram(& self, address: usize) -> u8{
+        return self.vram[address];
+    }
+
+    pub fn read_byte_oam(& self, address: usize) -> u8{
+        return self.oam[address];
     }
 
     pub fn update_scanlines(&mut self, cycles: u8){

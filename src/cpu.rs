@@ -21,6 +21,7 @@ pub struct CPU{
     link_cable: LinkCable,
     pub joypad: Joypad,
     pub apu: APU,
+    max_pc: u16,
 }
 pub enum MBCType{
     MBC0,
@@ -36,6 +37,7 @@ impl CPU{
             link_cable: LinkCable::new(),
             joypad: Joypad::new(),
             apu: APU::new(),
+            max_pc : 0,
         }
     }
 
@@ -50,6 +52,10 @@ impl CPU{
     }
 
     pub fn do_cycle(&mut self) -> u8 {
+        if self.registers.pc > self.max_pc {
+            self.max_pc = self.registers.pc;
+            self.print_registers();
+        }
         let instruction : u8 = self.read_byte(self.registers.pc);
         self.registers.pc+=1;
         let cycles = self.execute_instruction(instruction);
@@ -213,14 +219,30 @@ impl CPU{
             // More Register Movements
             0x77..=0x7F => {self.register_movement(instruction)},
             // ADD A, Reg
-            0x80..=0x87 => {self.alu_add8(instruction)}
-            // XOR A
-            0xAF => {self.registers.a = self.alu_xor(self.registers.a); 1},
+            0x80..=0x87 => {self.alu_add8(instruction)},
+            // ADC A, Reg
+            0x88..=0x8F => {self.alu_adc8(instruction)},
+            // SUB Reg
+            0x90..=0x97 => {self.alu_sub8(instruction)},
+            // SBC Reg
+            0x98..=0x9F => {self.alu_sbc8(instruction)},
+            // AND Reg
+            0xA0..=0xA7 => {self.alu_and(instruction)},
+            // XOR Reg
+            0xA8..=0xAF => {self.alu_xor(instruction)},
+            // OR Reg
+            0xB0..=0xB7 => {self.alu_or(instruction)},
             // JP a16
             0xC3 => {let address = self.fetch_word(); self.jump_to(address); 4},
-
+            // RET
+            0xC9 =>{self.ret(); 4},
+            // CALL a16
+            0xCD => {let value = self.fetch_word(); self.call(value); 6},
             // LDH (a8), A
             0xE0 => {let address = self.fetch_byte(); self.write_byte(0xFF00 + address as u16, self.registers.a); 3},
+            // LD (C), A
+            0xE2 => {let address: u8 = self.registers.c; self.write_byte(0xFF00 + address as u16, self.registers.a); 2},
+
             // LD (a16), A
             0xEA => {let address = self.fetch_word(); self.write_byte(address, self.registers.a); 4},
             // LDH A, (a8)
@@ -235,6 +257,30 @@ impl CPU{
                 /*panic!("Instruction 0x{:2X} not implemented!\n
             {:#4X?}", instruction, self.registers);},*/
         }
+    }
+
+    fn call(&mut self, address: u16){
+        self.push_to_stack(self.registers.pc);
+        self.jump_to(address)
+    }
+
+    fn ret(&mut self){
+        let address = self.pop_from_stack();
+        println!("Returning to {:#4X?}", address);
+        self.jump_to(address)
+    }
+
+    fn push_to_stack(&mut self, value: u16){
+        let new_sp = self.registers.sp - 2;
+        self.write_word(new_sp, value);
+        println!("Writing {:#4X?} to {:#4X?}", value, new_sp);
+        self.registers.sp = new_sp;
+    }
+
+    fn pop_from_stack(&mut self) -> u16{
+        let value  = self.read_word(self.registers.sp);
+        self.registers.sp = self.registers.sp + 2;
+        return value;
     }
 
     fn jr_if_nflag(&mut self, flag: CpuFlags) -> u8{
@@ -257,6 +303,134 @@ impl CPU{
         else{
             return 2;
         }
+    }
+
+    fn alu_xor(&mut self, opcode: u8) -> u8{
+        let source_register = parse_source_register_index_index(opcode);
+        let mut return_value = 1;
+        let operand;
+        if source_register == 0x06{
+            operand = self.get_byte_at_hl();
+            return_value += 1;
+        }
+        else{
+            operand = self.registers.get_register_by_index(source_register);
+        }
+        self.registers.a = self.registers.a ^ operand;
+        
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers.set_flags(CpuFlags::C, false);
+        self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+        
+        return return_value;
+    }
+
+    fn alu_and(&mut self, opcode: u8) -> u8{
+        let source_register = parse_source_register_index_index(opcode);
+        let mut return_value = 1;
+        let operand;
+        if source_register == 0x06{
+            operand = self.get_byte_at_hl();
+            return_value += 1;
+        }
+        else{
+            operand = self.registers.get_register_by_index(source_register);
+        }
+        self.registers.a = self.registers.a & operand;
+        
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, true);
+        self.registers.set_flags(CpuFlags::C, false);
+        self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+        
+        return return_value;
+    }
+    fn alu_or(&mut self, opcode: u8) -> u8{
+        let source_register = parse_source_register_index_index(opcode);
+        let mut return_value = 1;
+        let operand;
+        if source_register == 0x06{
+            operand = self.get_byte_at_hl();
+            return_value += 1;
+        }
+        else{
+            operand = self.registers.get_register_by_index(source_register);
+        }
+        self.registers.a = self.registers.a | operand;
+        
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers.set_flags(CpuFlags::C, false);
+        self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+        
+        return return_value;
+    }
+
+    fn alu_sub8(&mut self, opcode: u8) -> u8{
+        let source_register = parse_source_register_index_index(opcode);
+        let mut return_value = 1;
+        let operand;
+        if source_register == 0x06{
+            operand = self.get_byte_at_hl();
+            return_value += 1;
+        }
+        else{
+            operand = self.registers.get_register_by_index(source_register);
+        }
+        self.registers.a = self.registers.a.wrapping_sub(operand);
+        
+        self.registers.set_flags(CpuFlags::N, true);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_sub8(self.registers.a, operand));
+        self.registers.set_flags(CpuFlags::C, is_carry_sub8(self.registers.a, operand));
+        self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+        
+        return return_value;
+    }
+
+    fn alu_sbc8(&mut self, opcode: u8) -> u8{
+        let source_register = parse_source_register_index_index(opcode);
+        let mut return_value = 1;
+        let operand;
+        let c: u8 = if self.registers.get_flag(CpuFlags::C) {1} else {0};
+        if source_register == 0x06{
+            operand = self.get_byte_at_hl();
+            return_value += 1;
+        }
+        else{
+            operand = self.registers.get_register_by_index(source_register);
+        }
+        self.registers.a = self.registers.a.wrapping_sub(operand.wrapping_add(c));
+        
+        self.registers.set_flags(CpuFlags::N, true);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_sub16(self.registers.a as u16, (operand as u16).wrapping_add(c as u16)));
+        self.registers.set_flags(CpuFlags::C, is_carry_sub16(self.registers.a as u16, (operand as u16).wrapping_add(c as u16)));
+        self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+        
+        return return_value;
+    }
+
+    fn alu_adc8(&mut self, opcode: u8) -> u8{
+        let source_register = parse_source_register_index_index(opcode);
+        let mut return_value = 1;
+        let operand;
+        let c: u8 = if self.registers.get_flag(CpuFlags::C) {1} else {0};
+        if source_register == 0x06{
+            operand = self.get_byte_at_hl();
+            return_value += 1;
+        }
+        else{
+            operand = self.registers.get_register_by_index(source_register);
+        }
+ 
+        self.registers.a = self.registers.a.wrapping_add(operand.wrapping_add(c));
+        
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, is_half_carry_add8(self.registers.a, operand));
+        self.registers.set_flags(CpuFlags::C, is_carry_add16(self.registers.a as u16, (operand as u16) + (c as u16)));
+        self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+        
+        return return_value;
     }
 
     fn alu_add8(&mut self, opcode: u8) -> u8{
@@ -337,16 +511,6 @@ impl CPU{
 
     fn jump_to(&mut self, address: u16) {
         self.registers.pc = address;
-    }
-
-    fn alu_xor(&mut self, operand: u8) -> u8{
-        let value = self.registers.a ^ operand;
-        self.registers.set_flags(CpuFlags::Z, value == 0);
-        self.registers.set_flags(CpuFlags::N, false);
-        self.registers.set_flags(CpuFlags::H, false);
-        self.registers.set_flags(CpuFlags::C, false);
-
-        return value;
     }
 
     fn alu_inc(&mut self, value: u8) -> u8{
@@ -456,7 +620,8 @@ impl CPU{
     fn write_byte(&mut self, address: u16, value: u8){
         match address as usize{
             
-            VRAM_START..=VRAM_END => self.gpu.vram[address as usize - VRAM_START] = value,
+            VRAM_START..=VRAM_END => self.gpu.write_byte_vram(address as usize - VRAM_START, value),
+            OAM_START..=OAM_END => self.gpu.write_byte_oam(address as usize - OAM_START, value),
 
             UNUSED_AREA_START..=UNUSED_AREA_END => {}, // Do nothing
 
@@ -488,7 +653,8 @@ impl CPU{
 
     fn read_byte(& self, address: u16) -> u8{
         match address as usize{
-            VRAM_START..=VRAM_END => return self.gpu.vram[address as usize - VRAM_START],
+            VRAM_START..=VRAM_END => return self.gpu.read_byte_vram(address as usize - VRAM_START),
+            OAM_START..=OAM_END => return self.gpu.read_byte_oam(address as usize - OAM_START),
             UNUSED_AREA_START..=UNUSED_AREA_END => return 0xFF, // Default bus read
             STAT => self.gpu.stat(),
             LY => self.gpu.ly(),
@@ -499,6 +665,14 @@ impl CPU{
     fn read_word(& self, address: u16) -> u16{
         return (self.read_byte(address) as u16) | ((self.read_byte(address + 1) as u16) << 8);
     }
+}
+
+fn is_carry_sub8(a: u8, b: u8) -> bool{
+    return a < b;
+}
+
+fn is_carry_sub16(a: u16, b: u16) -> bool{
+    return a < b;
 }
 
 fn is_carry_add8(a: u8, b: u8) -> bool{
@@ -519,6 +693,10 @@ fn is_half_carry_add16(a: u16, value: u16) -> bool{
 
 fn is_half_carry_sub8(a: u8, value: u8) -> bool{
     return ((a & 0xF) as i8 - (value & 0xF) as i8) < 0;
+}
+
+fn is_half_carry_sub16(a: u16, value: u16) -> bool{
+    return ((a & 0x001F) as i16 - (value & 0x001F) as i16) < 0;
 }
 
 fn parse_destination_register(opcode: u8) -> u8{
