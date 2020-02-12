@@ -25,6 +25,8 @@ impl Device{
         let debug_mode : bool = false;
         let cycles_per_frame : u32 = 69905;
         let mut window = RenderWindow::new((640, 576), "GMBR Emulator", Style::CLOSE|Style::TITLEBAR, &Default::default());
+        window.set_active(true);
+
         loop{
             let now = Instant::now();
             let mut total_cycles : u32 = 0;
@@ -32,6 +34,20 @@ impl Device{
                 let cycles_elapsed = self.cpu.do_cycle() * 4;
                 total_cycles += cycles_elapsed as u32;
                 self.cpu.gpu.update_scanlines(cycles_elapsed);
+
+                // User input
+                while let Some(event) = window.poll_event() {
+                    
+                    match event {
+                        Event::Closed | Event::KeyPressed {code: sfml::window::Key::Escape, ..} => window.close(),
+                        Event::KeyPressed {code: sfml::window::Key::Up, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Up),
+                        Event::KeyPressed {code: sfml::window::Key::Down, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Down),
+                        Event::KeyPressed {code: sfml::window::Key::Left, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Left),
+                        Event::KeyPressed {code: sfml::window::Key::Right, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Right),
+
+                        _ => {},
+                    }
+                }
 
                 if self.cpu.gpu.stat_interrupt_req{
                     self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::LCDStat);
@@ -52,24 +68,6 @@ impl Device{
                     self.cpu.print_registers();
                     //cli::read_any_key();
                 }
-
-                // User input
-                while let Some(event) = window.poll_event() {
-                    
-                    match event {
-                        Event::Closed | Event::KeyPressed {code: sfml::window::Key::Escape, ..} => window.close(),
-                        Event::KeyPressed {code: sfml::window::Key::Up, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Up),
-                        Event::KeyPressed {code: sfml::window::Key::Down, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Down),
-                        Event::KeyPressed {code: sfml::window::Key::Left, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Left),
-                        Event::KeyPressed {code: sfml::window::Key::Right, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Right),
-
-                        _ => {},
-                    }
-                }
-                window.set_active(true);
-                
-                    
-                
             }
 
             window.display();
