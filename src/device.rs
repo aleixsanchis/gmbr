@@ -13,8 +13,6 @@ pub struct Device{
     cpu: CPU,
 }
 
-
-
 impl Device{
     pub fn new() -> Device{
         Device{
@@ -22,7 +20,7 @@ impl Device{
         }
     }
     pub fn run(&mut self) -> () {
-        let debug_mode : bool = false;
+        let mut debug_mode : bool = false;
         let cycles_per_frame : u32 = 69905;
         let mut window = RenderWindow::new((640, 576), "GMBR Emulator", Style::CLOSE|Style::TITLEBAR, &Default::default());
         window.set_active(true);
@@ -33,40 +31,53 @@ impl Device{
             while total_cycles < cycles_per_frame{
                 let cycles_elapsed = self.cpu.do_cycle() * 4;
                 total_cycles += cycles_elapsed as u32;
-                self.cpu.gpu.update_scanlines(cycles_elapsed);
 
-                // User input
-                while let Some(event) = window.poll_event() {
-                    
-                    match event {
-                        Event::Closed | Event::KeyPressed {code: sfml::window::Key::Escape, ..} => window.close(),
-                        Event::KeyPressed {code: sfml::window::Key::Up, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Up),
-                        Event::KeyPressed {code: sfml::window::Key::Down, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Down),
-                        Event::KeyPressed {code: sfml::window::Key::Left, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Left),
-                        Event::KeyPressed {code: sfml::window::Key::Right, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Right),
-
-                        _ => {},
+                if !self.cpu.cb_prefix {
+                    if self.cpu.mmu.dma_transfer {
+                        for i in 0..0xA0 {
+                            self.cpu.gpu.write_byte_oam(i as usize, self.cpu.mmu.read_byte(self.cpu.mmu.dma_address));
+                        }
+                        self.cpu.mmu.dma_transfer = false;
                     }
-                }
+                    self.cpu.gpu.update_scanlines(cycles_elapsed);
 
-                if self.cpu.gpu.stat_interrupt_req{
-                    self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::LCDStat);
-                    self.cpu.gpu.stat_interrupt_req = false;
-                }
+                    // User input
+                    while let Some(event) = window.poll_event() {
+                        
+                        match event {
+                            Event::Closed | Event::KeyPressed {code: sfml::window::Key::Escape, ..} => window.close(),
+                            Event::KeyPressed {code: sfml::window::Key::Up, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Up),
+                            Event::KeyPressed {code: sfml::window::Key::Down, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Down),
+                            Event::KeyPressed {code: sfml::window::Key::Left, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Left),
+                            Event::KeyPressed {code: sfml::window::Key::Right, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Right),
 
-                if self.cpu.gpu.vblank_interrupt_req{
-                    self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::VBlank);
-                    self.cpu.gpu.vblank_interrupt_req = false;
-                }
+                            _ => {},
+                        }
+                    }
 
-                if self.cpu.joypad.joypad_interrupt_req{
-                    self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::Joypad);
-                    self.cpu.joypad.joypad_interrupt_req = false;
-                }
+                    if self.cpu.gpu.stat_interrupt_req{
+                        self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::LCDStat);
+                        self.cpu.gpu.stat_interrupt_req = false;
+                    }
 
-                if debug_mode {
-                    self.cpu.print_registers();
-                    //cli::read_any_key();
+                    if self.cpu.gpu.vblank_interrupt_req{
+                        self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::VBlank);
+                        self.cpu.gpu.vblank_interrupt_req = false;
+                    }
+
+                    if self.cpu.joypad.joypad_interrupt_req{
+                        self.cpu.interrupt_controller.set_interrupt_flag(InterruptFlags::Joypad);
+                        self.cpu.joypad.joypad_interrupt_req = false;
+                    }
+
+                    if self.cpu.registers.pc == 0xffff{
+                        debug_mode = true;
+                    }
+
+                    if debug_mode{
+                        self.cpu.print_registers();
+                        cli::read_any_key();
+                    }
                 }
             }
 

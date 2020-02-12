@@ -12,6 +12,8 @@ pub struct MMU{
     mbc: Box<dyn MBC>,
     ram: [u8; RAM_SIZE],
     high_ram: [u8; HRAM_SIZE],
+    pub dma_transfer: bool,
+    pub dma_address: u16,
 }
 
 impl MMU{
@@ -20,6 +22,8 @@ impl MMU{
             mbc: Box::new(crate::mbc0::MBC0::new()),
             ram: [0; RAM_SIZE as usize],
             high_ram: [0; HRAM_SIZE as usize],
+            dma_transfer: false,
+            dma_address: 0,
         }
     }
     pub fn read_byte(&self, address: u16) -> u8{
@@ -53,5 +57,10 @@ impl MMU{
 
     pub fn open_rom(&mut self, rom_path : PathBuf){
         self.mbc.open_rom(rom_path);
+    }
+
+    pub fn start_dma(&mut self, offset: u8){
+        self.dma_transfer = true;
+        self.dma_address = ((offset as u16)<<8) & 0xFF00;
     }
 }
