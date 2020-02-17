@@ -45,7 +45,7 @@ impl Device{
                     while let Some(event) = window.poll_event() {
                         
                         match event {
-                            Event::Closed | Event::KeyPressed {code: sfml::window::Key::Escape, ..} => window.close(),
+                            Event::Closed | Event::KeyPressed {code: sfml::window::Key::Escape, ..} => {window.close(); std::process::exit(0)},
                             Event::KeyPressed {code: sfml::window::Key::Up, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Up),
                             Event::KeyPressed {code: sfml::window::Key::Down, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Down),
                             Event::KeyPressed {code: sfml::window::Key::Left, ..} => self.cpu.joypad.set_key_pressed(KeysPressed::Left),

@@ -1,13 +1,20 @@
-const VRAM_SIZE : usize = 0x2000;
-const OAM_SIZE : usize = 0xA0;
-const LYC_INTERRUPT_ENABLED : u8 = 0b0100_0000;
-const OAM_INTERRUPT_ENABLED : u8 = 0b0010_0000;
-const VBLANK_INTERRUPT_ENABLED : u8 = 0b001_0000;
-const HBLANK_INTERRUPT_ENABLED : u8 = 0b0000_1000;
+extern crate bit_field;
+use bit_field::BitField;
+
+const VRAM_SIZE: usize = 0x2000;
+const OAM_SIZE: usize = 0xA0;
+const LYC_INTERRUPT_ENABLED: u8 = 0b0100_0000;
+const OAM_INTERRUPT_ENABLED: u8 = 0b0010_0000;
+const VBLANK_INTERRUPT_ENABLED: u8 = 0b001_0000;
+const HBLANK_INTERRUPT_ENABLED: u8 = 0b0000_1000;
+const FRAMEBUFFER_WIDTH: usize = 160;
+const FRAMEBUFFER_HEIGTH: usize = 144;
+const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH*FRAMEBUFFER_HEIGTH;
 
 pub struct GPU{
     pub vram: [u8; VRAM_SIZE],
     pub oam: [u8; OAM_SIZE],
+    pub framebuffer: [u8; FRAMEBUFFER_SIZE],
     mode_counter: u32,
     line: u8,
     mode: GPU_modes,
@@ -38,12 +45,12 @@ impl GPU{
         GPU{
             vram: [0; VRAM_SIZE],
             oam: [0; OAM_SIZE],
+            framebuffer: [0; FRAMEBUFFER_SIZE],
             mode_counter: 0,
             line: 0,
             mode: GPU_modes::OAMSearch,
-            vblank_interrupt_req : false,
-            stat_interrupt_req : false,
-
+            vblank_interrupt_req: false,
+            stat_interrupt_req: false,
 
             lcdc: 0,
             stat: 0,
@@ -73,6 +80,17 @@ impl GPU{
         return self.oam[address];
     }
 
+    fn draw_scanline(&mut self){
+        if self.lcd_on() && (self.line as usize) < FRAMEBUFFER_HEIGTH{
+
+            // Background
+            let framebuffer_offset = self.line as usize * FRAMEBUFFER_WIDTH;
+
+            if self.sprites_on(){
+
+            }
+        }
+    }
     pub fn update_scanlines(&mut self, cycles: u8){
         if !self.lcd_on() {
             return;
@@ -97,6 +115,7 @@ impl GPU{
             if self.mode_counter >= 456 {
                 self.mode_counter -= 456;
                 // 144 lines + 10 of VBLANK
+                self.draw_scanline();
                 self.line = self.line + 1;
                 if self.line == 154 {
                     self.line = 0;
@@ -126,6 +145,10 @@ impl GPU{
 
     fn lcd_on(&self) -> bool{
         return self.lcdc & 0x80 == 0x80;
+    }
+
+    fn sprites_on(&self) -> bool{
+        return self.lcdc.get_bit(1);
     }
 
     fn lyc_interrupt_enabled(&self) -> bool{

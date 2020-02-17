@@ -248,12 +248,18 @@ impl CPU{
                 0xA8..=0xAF => {self.xor_opcode(instruction)},
                 // OR Reg
                 0xB0..=0xB7 => {self.or_opcode(instruction)},
+                // POP BC
+                0xC1 => {let value = self.pop_from_stack(); self.registers.setbc(value); 3},
                 // JP a16
                 0xC3 => {let address = self.fetch_word(); self.jump_to(address); 4},
                 // PUSH BC
                 0xC5 => {let value = self.registers.bc(); self.push_to_stack(value); 4},
+                // RET Z
+                0xC8 => {self.ret_if_flag(CpuFlags::Z)},
                 // RET
                 0xC9 => {self.ret(); 4},
+                // JP Z, a16
+                0xCA => {let address = self.fetch_word(); self.jp_if_flag(address, CpuFlags::Z)},
                 // CB
                 0xCB => {self.cb_prefix = true; 1},
                 // CALL a16
@@ -280,10 +286,14 @@ impl CPU{
                 0xEF => {self.rst(0x28); 4},
                 // LDH A, (a8)
                 0xF0 => {let address = self.fetch_byte(); self.registers.a = self.read_byte(0xFF00 + address as u16); 3},
+                // POP AF
+                0xF1 => {let value = self.pop_from_stack(); self.registers.setaf(value); 3},
                 // DI
                 0xF3 => {self.interrupt_controller.disable_master_interrupt(); 1},
                 // PUSH AF
                 0xF5 => {let value = self.registers.af(); self.push_to_stack(value); 4},
+                // LD A, (a16)
+                0xFA => {let address = self.fetch_word(); let value = self.read_byte(address); self.registers.a = value; 4},
                 // EI
                 0xFB => {self.interrupt_controller.enable_master_interrupt(); 1},
                 // CP, d8
@@ -303,6 +313,16 @@ impl CPU{
     fn call(&mut self, address: u16){
         self.push_to_stack(self.registers.pc);
         self.jump_to(address);
+    }
+
+    fn ret_if_flag(&mut self, flag: CpuFlags) -> u8{
+        if self.registers.get_flag(flag){
+            self.ret();
+            return 5;
+        }
+        else{
+            return 2;
+        }
     }
 
     fn ret(&mut self){
@@ -597,6 +617,16 @@ impl CPU{
 
         self.registers.set_flags(CpuFlags::N, true);
         self.registers.set_flags(CpuFlags::H, true);
+    }
+
+    fn jp_if_flag(&mut self, address: u16, flag: CpuFlags) -> u8{
+        if self.registers.get_flag(flag){
+            self.jump_to(address);
+            return 4;
+        }
+        else{
+            return 3;
+        }
     }
 
     fn calculate_jr_address(&mut self) -> u16{
