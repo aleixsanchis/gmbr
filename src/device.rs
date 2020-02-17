@@ -1,5 +1,10 @@
 extern crate sfml;
 
+const WINDOW_WIDTH: u32 = 160;
+const WINDOW_HEIGTH: u32 = 144;
+const PIXEL_SCALE: u32 = 1;
+
+
 use crate::cpu::CPU;
 use sfml::window::{Window, Event, Style};
 use sfml::graphics::{RenderWindow};
@@ -22,7 +27,7 @@ impl Device{
     pub fn run(&mut self) -> () {
         let mut debug_mode : bool = false;
         let cycles_per_frame : u32 = 69905;
-        let mut window = RenderWindow::new((640, 576), "GMBR Emulator", Style::CLOSE|Style::TITLEBAR, &Default::default());
+        let mut window = RenderWindow::new((WINDOW_WIDTH, WINDOW_HEIGTH), "GMBR Emulator", Style::CLOSE|Style::TITLEBAR, &Default::default());
         window.set_active(true);
 
         loop{

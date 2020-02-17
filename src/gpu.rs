@@ -85,6 +85,24 @@ impl GPU{
 
             // Background
             let framebuffer_offset = self.line as usize * FRAMEBUFFER_WIDTH;
+            let tilemap_vram_offset: usize = if self.lcdc.get_bit(3) {0x1C00} else {0x1800};
+            let mut unsigned: bool = true;
+            let tiledata_vram_offset: usize = if self.lcdc.get_bit(4) {0} else {unsigned = false; 0x0800};
+            let background_y = self.line.wrapping_add(self.scy);// This acts as a 256 modulo
+            let tile_row: u16 = ((background_y as u16)>>3)<<5;
+            // Background pass
+            for pixel in 0..FRAMEBUFFER_WIDTH{
+                let background_x = (pixel as u8).wrapping_add(self.scx);// This acts as a 256 modulo
+                self.framebuffer[framebuffer_offset + pixel] = 0;
+                let tile_column = background_x >> 3;
+                let tile_address: usize = tilemap_vram_offset + tile_row as usize + tile_column as usize;
+                if unsigned{
+
+                }
+                else{
+                    
+                }
+            }
 
             if self.sprites_on(){
 
@@ -115,7 +133,9 @@ impl GPU{
             if self.mode_counter >= 456 {
                 self.mode_counter -= 456;
                 // 144 lines + 10 of VBLANK
-                self.draw_scanline();
+                if (self.line as usize) < FRAMEBUFFER_HEIGTH{
+                    self.draw_scanline();
+                }
                 self.line = self.line + 1;
                 if self.line == 154 {
                     self.line = 0;
