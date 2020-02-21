@@ -1,15 +1,11 @@
-pub struct APU{
+pub struct APU {}
 
-}
-
-impl APU{
-    pub fn new() -> APU{
-        APU{
-
-        }
+impl APU {
+    pub fn new() -> APU {
+        APU {}
     }
 
-    pub fn do_nothing(&self){
+    pub fn do_nothing(&self) {
         println!("Sound not implemented yet");
     }
 }

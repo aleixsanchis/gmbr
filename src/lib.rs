@@ -1,17 +1,17 @@
 #![crate_name = "gmbr"]
-#![crate_type = "lib" ]
+#![crate_type = "lib"]
 
-pub mod device;
 pub mod cli;
+pub mod device;
 
+mod apu;
 mod cpu;
-mod registers;
-mod mmu;
-mod mbc;
-mod mbc0;
 mod gpu;
 mod interrupt_controller;
-mod memory_map;
-mod link_cable;
 mod joypad;
-mod apu;
+mod link_cable;
+mod mbc;
+mod mbc0;
+mod memory_map;
+mod mmu;
+mod registers;

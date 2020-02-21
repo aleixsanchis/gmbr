@@ -9,9 +9,9 @@ const VBLANK_INTERRUPT_ENABLED: u8 = 0b001_0000;
 const HBLANK_INTERRUPT_ENABLED: u8 = 0b0000_1000;
 const FRAMEBUFFER_WIDTH: usize = 160;
 const FRAMEBUFFER_HEIGTH: usize = 144;
-const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH*FRAMEBUFFER_HEIGTH;
+const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGTH * 4; // RGBA, so 4 u8s
 
-pub struct GPU{
+pub struct GPU {
     pub vram: [u8; VRAM_SIZE],
     pub oam: [u8; OAM_SIZE],
     pub framebuffer: [u8; FRAMEBUFFER_SIZE],
@@ -33,19 +33,19 @@ pub struct GPU{
 }
 
 #[derive(PartialEq)]
-enum GPU_modes{
+enum GPU_modes {
     OAMSearch,
     ActivePicture,
     HBlank,
     VBlank,
 }
 
-impl GPU{
-    pub fn new() -> GPU{
-        GPU{
+impl GPU {
+    pub fn new() -> GPU {
+        GPU {
             vram: [0; VRAM_SIZE],
             oam: [0; OAM_SIZE],
-            framebuffer: [0; FRAMEBUFFER_SIZE],
+            framebuffer: [130; FRAMEBUFFER_SIZE],
             mode_counter: 0,
             line: 0,
             mode: GPU_modes::OAMSearch,
@@ -54,8 +54,8 @@ impl GPU{
 
             lcdc: 0,
             stat: 0,
-            scy : 0,
-            scx : 0,
+            scy: 0,
+            scx: 0,
             //ly: 0,
             lyc: 0,
             bgp: 0,
@@ -64,52 +64,53 @@ impl GPU{
         }
     }
 
-    pub fn write_byte_vram(&mut self, address: usize, value: u8){
+    pub fn write_byte_vram(&mut self, address: usize, value: u8) {
         self.vram[address] = value;
     }
 
-    pub fn write_byte_oam(&mut self, address: usize, value: u8){
+    pub fn write_byte_oam(&mut self, address: usize, value: u8) {
         self.oam[address] = value;
     }
 
-    pub fn read_byte_vram(& self, address: usize) -> u8{
+    pub fn read_byte_vram(&self, address: usize) -> u8 {
         return self.vram[address];
     }
 
-    pub fn read_byte_oam(& self, address: usize) -> u8{
+    pub fn read_byte_oam(&self, address: usize) -> u8 {
         return self.oam[address];
     }
 
-    fn draw_scanline(&mut self){
-        if self.lcd_on() && (self.line as usize) < FRAMEBUFFER_HEIGTH{
-
+    fn draw_scanline(&mut self) {
+        if self.lcd_on() && (self.line as usize) < FRAMEBUFFER_HEIGTH {
             // Background
-            let framebuffer_offset = self.line as usize * FRAMEBUFFER_WIDTH;
-            let tilemap_vram_offset: usize = if self.lcdc.get_bit(3) {0x1C00} else {0x1800};
+            let framebuffer_offset = self.line as usize * FRAMEBUFFER_WIDTH * 4;
+            let tilemap_vram_offset: usize = if self.lcdc.get_bit(3) { 0x1C00 } else { 0x1800 };
             let mut unsigned: bool = true;
-            let tiledata_vram_offset: usize = if self.lcdc.get_bit(4) {0} else {unsigned = false; 0x0800};
-            let background_y = self.line.wrapping_add(self.scy);// This acts as a 256 modulo
-            let tile_row: u16 = ((background_y as u16)>>3)<<5;
+            let tiledata_vram_offset: usize;
+            if self.lcdc.get_bit(4) {
+                tiledata_vram_offset = 0;
+            } else {
+                unsigned = false;
+                tiledata_vram_offset = 0x0800;
+            }
+            let line_y = self.line.wrapping_add(self.scy); // This acts as a 256 modulo
+            let tile_row: u16 = ((line_y as u16) >> 3) << 5;
             // Background pass
-            for pixel in 0..FRAMEBUFFER_WIDTH{
-                let background_x = (pixel as u8).wrapping_add(self.scx);// This acts as a 256 modulo
-                self.framebuffer[framebuffer_offset + pixel] = 0;
-                let tile_column = background_x >> 3;
-                let tile_address: usize = tilemap_vram_offset + tile_row as usize + tile_column as usize;
-                if unsigned{
-
+            for pixel in 0..FRAMEBUFFER_WIDTH {
+                let line_x = (pixel as u8).wrapping_add(self.scx); // This acts as a 256 modulo
+                let tile_column = line_x >> 3;
+                let tile_address: usize =
+                    tilemap_vram_offset + tile_row as usize + tile_column as usize;
+                if unsigned {
+                } else {
                 }
-                else{
-                    
-                }
+                let index = pixel*4;
             }
 
-            if self.sprites_on(){
-
-            }
+            if self.sprites_on() {}
         }
     }
-    pub fn update_scanlines(&mut self, cycles: u8){
+    pub fn update_scanlines(&mut self, cycles: u8) {
         if !self.lcd_on() {
             return;
         }
@@ -121,8 +122,7 @@ impl GPU{
 
             if dots_left >= 80 {
                 iteration_dots = 80;
-            }
-            else {
+            } else {
                 iteration_dots = dots_left;
             }
 
@@ -133,7 +133,7 @@ impl GPU{
             if self.mode_counter >= 456 {
                 self.mode_counter -= 456;
                 // 144 lines + 10 of VBLANK
-                if (self.line as usize) < FRAMEBUFFER_HEIGTH{
+                if (self.line as usize) < FRAMEBUFFER_HEIGTH {
                     self.draw_scanline();
                 }
                 self.line = self.line + 1;
@@ -144,124 +144,116 @@ impl GPU{
                 self.check_lyc_interrupt();
             }
 
-            if self.line >= 144 && self.mode != GPU_modes::VBlank{
+            if self.line >= 144 && self.mode != GPU_modes::VBlank {
                 self.change_mode(GPU_modes::VBlank)
-            }
-
-            else if self.line < 144 {
+            } else if self.line < 144 {
                 if self.mode_counter <= 80 && self.mode != GPU_modes::OAMSearch {
                     self.change_mode(GPU_modes::OAMSearch);
                 }
                 // TODO maybe actually use the correct value based on window and scrolling register
                 else if self.mode_counter <= 252 && self.mode != GPU_modes::ActivePicture {
                     self.change_mode(GPU_modes::ActivePicture);
-                }
-                else{
+                } else {
                     self.change_mode(GPU_modes::HBlank);
                 }
             }
         }
     }
 
-    fn lcd_on(&self) -> bool{
+    fn lcd_on(&self) -> bool {
         return self.lcdc & 0x80 == 0x80;
     }
 
-    fn sprites_on(&self) -> bool{
+    fn sprites_on(&self) -> bool {
         return self.lcdc.get_bit(1);
     }
 
-    fn lyc_interrupt_enabled(&self) -> bool{
+    fn lyc_interrupt_enabled(&self) -> bool {
         return self.stat & LYC_INTERRUPT_ENABLED == LYC_INTERRUPT_ENABLED;
     }
 
-    fn check_lyc_interrupt(&mut self){
+    fn check_lyc_interrupt(&mut self) {
         if self.lyc == self.line && self.lyc_interrupt_enabled() {
             self.stat_interrupt_req = true;
         }
     }
-    fn change_mode(&mut self, new_mode: GPU_modes){
+    fn change_mode(&mut self, new_mode: GPU_modes) {
         self.mode = new_mode;
         self.stat &= 0b0111_1100;
         match self.mode {
-            // TODO 
+            // TODO
             GPU_modes::VBlank => {
                 self.stat |= 0b0000_0001;
                 self.vblank_interrupt_req = true;
-            },
+            }
 
             GPU_modes::OAMSearch => {
                 self.stat |= 0b0000_0010;
-
-            },
+            }
 
             GPU_modes::ActivePicture => {
                 self.stat |= 0b0000_0011;
-            },
+            }
 
-            GPU_modes::HBlank => {
-            },
+            GPU_modes::HBlank => {}
         }
-
     }
 
-    pub fn set_lcdc(&mut self, value: u8){
+    pub fn set_lcdc(&mut self, value: u8) {
         self.lcdc = value;
     }
 
-    pub fn set_stat(&mut self, value: u8){
+    pub fn set_stat(&mut self, value: u8) {
         // Only modifying Read/Write values
-        self.stat = value&0b0111_1000
+        self.stat = value & 0b0111_1000
 
-
-
-        // TODO Game Boy makes the LCD interrupt sometimes trigger when writing to STAT 
-        // (including writing $00) during OAM scan, H-Blank, V-Blank, or LY=LYC. 
-        // It behaves as if $FF were written for one cycle, and then the written 
+        // TODO Game Boy makes the LCD interrupt sometimes trigger when writing to STAT
+        // (including writing $00) during OAM scan, H-Blank, V-Blank, or LY=LYC.
+        // It behaves as if $FF were written for one cycle, and then the written
         // value were written the next cycle.
     }
 
-    pub fn stat(&self) -> u8{
+    pub fn stat(&self) -> u8 {
         return self.stat;
     }
 
-    pub fn set_scy(&mut self, value: u8){
+    pub fn set_scy(&mut self, value: u8) {
         self.scy = value;
     }
 
-    pub fn set_scx(&mut self, value: u8){
+    pub fn set_scx(&mut self, value: u8) {
         self.scx = value;
     }
 
-    pub fn ly(&self) -> u8{
+    pub fn ly(&self) -> u8 {
         return self.line;
     }
 
-    pub fn set_lyc(&mut self, value: u8){
+    pub fn set_lyc(&mut self, value: u8) {
         self.lyc = value;
     }
 
-    pub fn bgp(&self) -> u8{
+    pub fn bgp(&self) -> u8 {
         return self.bgp;
     }
 
-    pub fn set_bgp(&mut self, value: u8){
+    pub fn set_bgp(&mut self, value: u8) {
         self.bgp = value;
     }
 
-    pub fn obp0(&self) -> u8{
+    pub fn obp0(&self) -> u8 {
         return self.obp0;
     }
 
-    pub fn set_obp0(&mut self, value: u8){
+    pub fn set_obp0(&mut self, value: u8) {
         self.obp0 = value;
     }
 
-    pub fn obp1(&self) -> u8{
+    pub fn obp1(&self) -> u8 {
         return self.obp1;
     }
 
-    pub fn set_obp1(&mut self, value: u8){
+    pub fn set_obp1(&mut self, value: u8) {
         self.obp1 = value;
     }
 }
