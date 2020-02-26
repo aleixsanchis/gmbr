@@ -11,6 +11,39 @@ const FRAMEBUFFER_WIDTH: usize = 160;
 const FRAMEBUFFER_HEIGTH: usize = 144;
 const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGTH * 4; // RGBA, so 4 u8s
 
+#[derive(Debug,PartialEq,Eq)]
+struct Color {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
+}
+
+const WHITE: Color = Color {
+    r: 224,
+    g: 248,
+    b: 208,
+    a: 255,
+};
+const LIGHT_GRAY: Color = Color {
+    r: 136,
+    g: 192,
+    b: 112,
+    a: 255,
+};
+const DARK_GRAY: Color = Color {
+    r: 39,
+    g: 80,
+    b: 70,
+    a: 255,
+};
+const BLACK: Color = Color {
+    r: 8,
+    g: 24,
+    b: 32,
+    a: 255,
+};
+
 pub struct GPU {
     pub vram: [u8; VRAM_SIZE],
     pub oam: [u8; OAM_SIZE],
@@ -45,7 +78,7 @@ impl GPU {
         GPU {
             vram: [0; VRAM_SIZE],
             oam: [0; OAM_SIZE],
-            framebuffer: [130; FRAMEBUFFER_SIZE],
+            framebuffer: [0; FRAMEBUFFER_SIZE],
             mode_counter: 0,
             line: 0,
             mode: GPU_modes::OAMSearch,
@@ -83,7 +116,7 @@ impl GPU {
     fn draw_scanline(&mut self) {
         if self.lcd_on() && (self.line as usize) < FRAMEBUFFER_HEIGTH {
             // Background
-            let framebuffer_offset = self.line as usize * FRAMEBUFFER_WIDTH * 4;
+            let line_offset = self.line as usize * FRAMEBUFFER_WIDTH * 4;
             let tilemap_vram_offset: usize = if self.lcdc.get_bit(3) { 0x1C00 } else { 0x1800 };
             let mut unsigned: bool = true;
             let tiledata_vram_offset: usize;
@@ -101,15 +134,59 @@ impl GPU {
                 let tile_column = line_x >> 3;
                 let tile_address: usize =
                     tilemap_vram_offset + tile_row as usize + tile_column as usize;
-                if unsigned {
+                let tile_num = if unsigned {
+                    self.vram[tile_address] as u16 as i16
                 } else {
-                }
-                let index = pixel*4;
+                    self.vram[tile_address] as i8 as i16
+                };
+
+                let tile_location: usize = if unsigned{
+                    tiledata_vram_offset + ((tile_num as u16) << 4) as usize
+                } else {
+                    tiledata_vram_offset + ((tile_num + 128) << 4) as usize
+                };
+
+                let line = (line_y as u16 % 8) * 2;
+                let data1: u8 = self.vram[tile_location + line as usize];
+                let data2: u8 = self.vram[tile_location + (line + 1) as usize];
+
+                let color_bit = ((line_x as i32 % 8) - 7) * -1;
+                let color_num = ((data2 >> color_bit) & 0b1) << 1;
+                let color_num = color_num | ((data1 >> color_bit) & 0b1);
+                let color = self.get_color(color_num, self.bgp);
+
+                let index = line_offset + pixel * 4;
+                self.framebuffer[index] = color.r;
+                self.framebuffer[index + 1] = color.g;
+                self.framebuffer[index + 2] = color.b;
+                self.framebuffer[index + 3] = color.a;
             }
 
             if self.sprites_on() {}
         }
     }
+    fn get_color(&self, color_id: u8, palette_num: u8) -> Color {
+
+        let (hi, lo) = match color_id {
+            0 => (1, 0),
+            1 => (3, 2),
+            2 => (5, 4),
+            3 => (7, 6),
+            _ => panic!("Invalid color id: 0x{:x}", color_id),
+        };
+
+        let color = ((palette_num >> hi) & 0b1) << 1;
+        let color = color | ((palette_num >> lo) & 0b1);
+
+        match color {
+            0 => WHITE,
+            1 => LIGHT_GRAY,
+            2 => DARK_GRAY,
+            3 => BLACK,
+            _ => panic!("Invalid color: 0x{:x}", color),
+        }
+    }
+
     pub fn update_scanlines(&mut self, cycles: u8) {
         if !self.lcd_on() {
             return;
