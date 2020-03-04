@@ -459,6 +459,15 @@ impl CPU {
                 0xA8..=0xAF => self.xor_opcode(instruction),
                 // OR Reg
                 0xB0..=0xB7 => self.or_opcode(instruction),
+                // RET N>
+                0xC0 => {
+                    if !self.registers.get_flag(CpuFlags::Z) {
+                        self.ret(); 
+                        5
+                    } else {
+                        2
+                    }
+                },
                 // POP BC
                 0xC1 => {
                     let value = self.pop_from_stack();
@@ -510,6 +519,12 @@ impl CPU {
                 0xD5 => {
                     let value = self.registers.de();
                     self.push_to_stack(value);
+                    4
+                }
+                // RETI
+                0xD9 => {
+                    self.ret();
+                    self.interrupt_controller.enable_master_interrupt();
                     4
                 }
                 // LDH (a8), A
@@ -634,7 +649,7 @@ impl CPU {
         self.jump_to(address);
     }
 
-    fn push_to_stack(&mut self, value: u16) {
+    pub fn push_to_stack(&mut self, value: u16) {
         let new_sp = self.registers.sp - 2;
         self.write_word(new_sp, value);
         self.registers.sp = new_sp;
@@ -1094,6 +1109,8 @@ impl CPU {
             SCY => self.gpu.set_scy(value),
             SCX => self.gpu.set_scx(value),
             LYC => self.gpu.set_lyc(value),
+            WY => self.gpu.set_wy(value),
+            WX => self.gpu.set_wx(value),
             DMA => self.mmu.start_dma(value),
             BGP => self.gpu.set_bgp(value),
             OBP0 => self.gpu.set_obp0(value),
@@ -1117,8 +1134,11 @@ impl CPU {
             VRAM_START..=VRAM_END => return self.gpu.read_byte_vram(address as usize - VRAM_START),
             OAM_START..=OAM_END => return self.gpu.read_byte_oam(address as usize - OAM_START),
             UNUSED_AREA_START..=UNUSED_AREA_END => return 0xFF, // Default bus read
+            JOYP => self.joypad.joyp(),
+            LCDC => self.gpu.lcdc(),
             STAT => self.gpu.stat(),
             LY => self.gpu.ly(),
+            IE => self.interrupt_controller.ie(),
             _ => return self.mmu.read_byte(address),
         }
     }

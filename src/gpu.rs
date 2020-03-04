@@ -63,6 +63,8 @@ pub struct GPU {
     bgp: u8,
     obp0: u8,
     obp1: u8,
+    wy: u8,
+    wx: u8,
 }
 
 #[derive(PartialEq)]
@@ -94,6 +96,8 @@ impl GPU {
             bgp: 0,
             obp0: 0,
             obp1: 0,
+            wx: 0,
+            wy: 0,
         }
     }
 
@@ -275,6 +279,10 @@ impl GPU {
             GPU_modes::HBlank => {}
         }
     }
+    
+    pub fn lcdc(&self) -> u8{
+        return self.lcdc;
+    }
 
     pub fn set_lcdc(&mut self, value: u8) {
         self.lcdc = value;
@@ -332,5 +340,21 @@ impl GPU {
 
     pub fn set_obp1(&mut self, value: u8) {
         self.obp1 = value;
+    }
+
+    pub fn wy(&self) -> u8{
+        return self.wy;
+    }
+    
+    pub fn set_wy(&mut self, value: u8) {
+        self.wy = value;
+    }
+
+    pub fn wx(&self) -> u8{
+        return self.wx;
+    }
+
+    pub fn set_wx(&mut self, value: u8) {
+        self.wx = value;
     }
 }

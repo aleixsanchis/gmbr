@@ -105,14 +105,40 @@ impl Device {
                         self.cpu.joypad.joypad_interrupt_req = false;
                     }
 
-                    if false {
-                        debug_mode = true;
+                    if self.cpu.interrupt_controller.ime() {
+
+                        match self.cpu.interrupt_controller.get_first_interrupt() {
+                            InterruptFlags::VBlank => {
+                                self.cpu.push_to_stack(self.cpu.registers.pc);
+                                self.cpu.registers.pc = 0x0040;
+                                self.cpu.interrupt_controller.clear_interrupt_flag(InterruptFlags::VBlank);
+                                total_cycles += 5;
+                            },
+                            InterruptFlags::LCDStat => {
+                                self.cpu.push_to_stack(self.cpu.registers.pc);
+                                self.cpu.registers.pc = 0x0048;
+                                self.cpu.interrupt_controller.clear_interrupt_flag(InterruptFlags::LCDStat);
+                                total_cycles += 5;
+                            },
+                            InterruptFlags::Joypad => {
+                                self.cpu.push_to_stack(self.cpu.registers.pc);
+                                self.cpu.registers.pc = 0x0060;
+                                self.cpu.interrupt_controller.clear_interrupt_flag(InterruptFlags::Joypad);
+                                total_cycles += 5;
+                            },
+                            _ => {},
+                        }
                     }
 
-                    if debug_mode {
+                    
+                    if debug_mode == true {
                         self.cpu.print_registers();
                         cli::read_any_key();
                     }
+
+                    if self.cpu.registers.pc == 0x02cd  {
+                        debug_mode = true;
+                    } 
                 }
             }
             

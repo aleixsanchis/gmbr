@@ -65,8 +65,8 @@ pub const WY: usize = 0xFF4A;
 pub const WX: usize = 0xFF4B;
 
 // INTERRUPTS
-pub const IE: usize = 0xFF0F;
-pub const IF: usize = 0xFFFF;
+pub const IF: usize = 0xFF0F;
+pub const IE: usize = 0xFFFF;
 
 // LINK CABLE
 pub const SB: usize = 0xFF01;
