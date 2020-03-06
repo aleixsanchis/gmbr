@@ -1,3 +1,4 @@
+// MEMORY
 pub const ROM_START: usize = 0x0000;
 pub const ROM_END: usize = 0x7FFF;
 
@@ -13,7 +14,6 @@ pub const MIRROR_END: usize = 0xFDFF;
 pub const OAM_START: usize = 0xFE00;
 pub const OAM_END: usize = 0xFE9F;
 
-// MISC
 pub const UNUSED_AREA_START: usize = 0xFEA0;
 pub const UNUSED_AREA_END: usize = 0xFEFF;
 
@@ -24,6 +24,17 @@ pub const HRAM_END: usize = 0xFFFE;
 
 // JOYPAD
 pub const JOYP: usize = 0xFF00;
+
+
+// LINK CABLE
+pub const SB: usize = 0xFF01;
+pub const SC: usize = 0xFF02;
+
+// TIMER
+pub const DIV: usize = 0xFF04;
+pub const TIMA: usize = 0xFF05;
+pub const TMA: usize = 0xFF06;
+pub const TAC: usize = 0xFF07;
 
 // SOUND
 pub const NR10: usize = 0xFF10;
@@ -67,7 +78,3 @@ pub const WX: usize = 0xFF4B;
 // INTERRUPTS
 pub const IF: usize = 0xFF0F;
 pub const IE: usize = 0xFFFF;
-
-// LINK CABLE
-pub const SB: usize = 0xFF01;
-pub const SC: usize = 0xFF02;

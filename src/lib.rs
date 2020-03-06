@@ -15,3 +15,4 @@ mod mbc0;
 mod memory_map;
 mod mmu;
 mod registers;
+mod timer;

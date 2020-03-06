@@ -7,7 +7,7 @@ const PIXEL_SCALE: u32 = 3;
 use crate::cli;
 use crate::cpu::CPU;
 use crate::interrupt_controller::InterruptFlags;
-use crate::joypad::KeysPressed;
+use crate::joypad::KeyValue;
 use sfml::graphics::{RenderWindow, Sprite, Texture, RenderTarget, Transformable, Color};
 use sfml::system::Vector2f;
 use sfml::window::{Event, Style};
@@ -66,19 +66,19 @@ impl Device {
                             Event::KeyPressed {
                                 code: sfml::window::Key::Up,
                                 ..
-                            } => self.cpu.joypad.set_key_pressed(KeysPressed::Up),
+                            } => self.cpu.joypad.set_key_pressed(KeyValue::Up),
                             Event::KeyPressed {
                                 code: sfml::window::Key::Down,
                                 ..
-                            } => self.cpu.joypad.set_key_pressed(KeysPressed::Down),
+                            } => self.cpu.joypad.set_key_pressed(KeyValue::Down),
                             Event::KeyPressed {
                                 code: sfml::window::Key::Left,
                                 ..
-                            } => self.cpu.joypad.set_key_pressed(KeysPressed::Left),
+                            } => self.cpu.joypad.set_key_pressed(KeyValue::Left),
                             Event::KeyPressed {
                                 code: sfml::window::Key::Right,
                                 ..
-                            } => self.cpu.joypad.set_key_pressed(KeysPressed::Right),
+                            } => self.cpu.joypad.set_key_pressed(KeyValue::Right),
 
                             _ => {}
                         }
@@ -106,7 +106,7 @@ impl Device {
                     }
 
                     if self.cpu.interrupt_controller.ime() {
-
+                        self.cpu.interrupt_controller.disable_master_interrupt();
                         match self.cpu.interrupt_controller.get_first_interrupt() {
                             InterruptFlags::VBlank => {
                                 self.cpu.push_to_stack(self.cpu.registers.pc);
@@ -136,8 +136,8 @@ impl Device {
                         cli::read_any_key();
                     }
 
-                    if self.cpu.registers.pc == 0x02cd  {
-                        debug_mode = true;
+                    if self.cpu.registers.pc == 0x02d6 {
+                        debug_mode = false;
                     } 
                 }
             }

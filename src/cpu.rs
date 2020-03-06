@@ -8,6 +8,7 @@ use crate::gpu::GPU;
 use crate::interrupt_controller::InterruptController;
 use crate::joypad::*;
 use crate::link_cable::LinkCable;
+use crate::timer::Timer;
 use crate::memory_map::*;
 use std::fs::File;
 use std::io::Read;
@@ -21,6 +22,7 @@ pub struct CPU {
     link_cable: LinkCable,
     pub joypad: Joypad,
     pub apu: APU,
+    pub timer: Timer,
     max_pc: u16,
     pub cb_prefix: bool,
 }
@@ -37,6 +39,7 @@ impl CPU {
             link_cable: LinkCable::new(),
             joypad: Joypad::new(),
             apu: APU::new(),
+            timer: Timer::new(),
             max_pc: 0,
             cb_prefix: false,
         }
@@ -459,7 +462,7 @@ impl CPU {
                 0xA8..=0xAF => self.xor_opcode(instruction),
                 // OR Reg
                 0xB0..=0xB7 => self.or_opcode(instruction),
-                // RET N>
+                // RET NZ
                 0xC0 => {
                     if !self.registers.get_flag(CpuFlags::Z) {
                         self.ret(); 
@@ -1102,6 +1105,8 @@ impl CPU {
             UNUSED_AREA_START..=UNUSED_AREA_END => {} // Do nothing
 
             JOYP => self.joypad.set_joyp(value),
+
+            TMA => self.timer.set_tma(value),
 
             NR10..=WPR_START => self.apu.do_nothing(),
             LCDC => self.gpu.set_lcdc(value),

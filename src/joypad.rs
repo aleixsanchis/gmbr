@@ -6,7 +6,7 @@ pub struct Joypad {
 }
 
 #[derive(Debug)]
-pub enum KeysPressed {
+pub enum KeyValue {
     Down,
     Up,
     Left,
@@ -20,32 +20,50 @@ pub enum KeysPressed {
 impl Joypad {
     pub fn new() -> Joypad {
         Joypad {
-            buttons_pressed: 0,
-            directions_pressed: 0,
+            buttons_pressed: 0x0F,
+            directions_pressed: 0x0F,
             joyp: 0,
             joypad_interrupt_req: false,
         }
     }
 
-    pub fn set_key_pressed(&mut self, key: KeysPressed) {
+    pub fn set_key_pressed(&mut self, key: KeyValue) {
+        // 0 is pressed
         match key {
-            KeysPressed::Down => self.directions_pressed &= 0b0000_0111,
-            KeysPressed::Up => self.directions_pressed &= 0b0000_1011,
-            KeysPressed::Left => self.directions_pressed &= 0b0000_1101,
-            KeysPressed::Right => self.directions_pressed &= 0b0000_1110,
+            KeyValue::Down => self.directions_pressed &= !0b0000_1000,
+            KeyValue::Up => self.directions_pressed &= !0b0000_0100,
+            KeyValue::Left => self.directions_pressed &= !0b0000_0010,
+            KeyValue::Right => self.directions_pressed &= !0b0000_0001,
 
-            KeysPressed::Start => self.buttons_pressed &= 0b0000_0111,
-            KeysPressed::Select => self.buttons_pressed &= 0b0000_1011,
-            KeysPressed::B => self.buttons_pressed &= 0b0000_1101,
-            KeysPressed::A => self.buttons_pressed &= 0b0000_1110,
+            KeyValue::Start => self.buttons_pressed &= !0b0000_1000,
+            KeyValue::Select => self.buttons_pressed &= !0b0000_0100,
+            KeyValue::B => self.buttons_pressed &= !0b0000_0010,
+            KeyValue::A => self.buttons_pressed &= !0b0000_0001,
         }
+
+        self.joypad_interrupt_req = true;
 
         println!("Key pressed! {:?}", key);
     }
 
+    pub fn set_key_released(&mut self, key: KeyValue) {
+        // 1 is not pressed
+        match key {
+            KeyValue::Down => self.directions_pressed |= 0b0000_1000,
+            KeyValue::Up => self.directions_pressed |= 0b0000_0100,
+            KeyValue::Left => self.directions_pressed |= 0b0000_0010,
+            KeyValue::Right => self.directions_pressed |= 0b0000_0001,
+
+            KeyValue::Start => self.buttons_pressed |= 0b0000_1000,
+            KeyValue::Select => self.buttons_pressed |= 0b0000_0100,
+            KeyValue::B => self.buttons_pressed |= 0b0000_0010,
+            KeyValue::A => self.buttons_pressed |= 0b0000_0001,
+        }
+    }
+
     pub fn joyp(&self) -> u8 {
         // Button Keys
-        if self.joyp & 0b0010_0000 == 0b0010_0000 {
+        if self.joyp & 0b0010_0000 == 0 {
             return self.buttons_pressed;
         } else {
             return self.directions_pressed;

@@ -67,7 +67,7 @@ pub struct GPU {
     wx: u8,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 enum GPU_modes {
     OAMSearch,
     ActivePicture,
@@ -249,6 +249,15 @@ impl GPU {
         return self.lcdc.get_bit(1);
     }
 
+    fn mode_interrupt_enabled(&self, mode: GPU_modes) -> bool {
+        match mode {
+            GPU_modes::HBlank => return self.lcdc & HBLANK_INTERRUPT_ENABLED == HBLANK_INTERRUPT_ENABLED,
+            GPU_modes::VBlank => return self.lcdc & VBLANK_INTERRUPT_ENABLED == VBLANK_INTERRUPT_ENABLED,
+            GPU_modes::OAMSearch => return self.lcdc & OAM_INTERRUPT_ENABLED == OAM_INTERRUPT_ENABLED,
+            _ => return false,
+        }
+    }
+
     fn lyc_interrupt_enabled(&self) -> bool {
         return self.stat & LYC_INTERRUPT_ENABLED == LYC_INTERRUPT_ENABLED;
     }
@@ -259,8 +268,8 @@ impl GPU {
         }
     }
     fn change_mode(&mut self, new_mode: GPU_modes) {
-        self.mode = new_mode;
         self.stat &= 0b0111_1100;
+        self.mode = new_mode;
         match self.mode {
             // TODO
             GPU_modes::VBlank => {
@@ -277,6 +286,9 @@ impl GPU {
             }
 
             GPU_modes::HBlank => {}
+        }
+        if self.mode_interrupt_enabled(self.mode){
+            self.stat_interrupt_req = true;
         }
     }
     
