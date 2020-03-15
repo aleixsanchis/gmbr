@@ -59,6 +59,7 @@ impl Joypad {
             KeyValue::B => self.buttons_pressed |= 0b0000_0010,
             KeyValue::A => self.buttons_pressed |= 0b0000_0001,
         }
+        println!("Key released! {:?}", key);
     }
 
     pub fn joyp(&self) -> u8 {

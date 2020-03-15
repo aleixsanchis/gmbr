@@ -25,7 +25,6 @@ pub const HRAM_END: usize = 0xFFFE;
 // JOYPAD
 pub const JOYP: usize = 0xFF00;
 
-
 // LINK CABLE
 pub const SB: usize = 0xFF01;
 pub const SC: usize = 0xFF02;

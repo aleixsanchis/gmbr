@@ -32,7 +32,7 @@ impl MMU {
 
             _ => {
                 println!("Invalid Read! This memory section is not supported (yet?). The location was {:#6X}", address);
-                0xFF
+                return 0xFF;
             }
         }
     }

@@ -11,7 +11,7 @@ const FRAMEBUFFER_WIDTH: usize = 160;
 const FRAMEBUFFER_HEIGTH: usize = 144;
 const FRAMEBUFFER_SIZE: usize = FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGTH * 4; // RGBA, so 4 u8s
 
-#[derive(Debug,PartialEq,Eq)]
+#[derive(Debug, PartialEq, Eq)]
 struct Color {
     r: u8,
     g: u8,
@@ -144,7 +144,7 @@ impl GPU {
                     self.vram[tile_address] as i8 as i16
                 };
 
-                let tile_location: usize = if unsigned{
+                let tile_location: usize = if unsigned {
                     tiledata_vram_offset + ((tile_num as u16) << 4) as usize
                 } else {
                     tiledata_vram_offset + ((tile_num + 128) << 4) as usize
@@ -170,7 +170,6 @@ impl GPU {
         }
     }
     fn get_color(&self, color_id: u8, palette_num: u8) -> Color {
-
         let (hi, lo) = match color_id {
             0 => (1, 0),
             1 => (3, 2),
@@ -251,9 +250,15 @@ impl GPU {
 
     fn mode_interrupt_enabled(&self, mode: GPU_modes) -> bool {
         match mode {
-            GPU_modes::HBlank => return self.lcdc & HBLANK_INTERRUPT_ENABLED == HBLANK_INTERRUPT_ENABLED,
-            GPU_modes::VBlank => return self.lcdc & VBLANK_INTERRUPT_ENABLED == VBLANK_INTERRUPT_ENABLED,
-            GPU_modes::OAMSearch => return self.lcdc & OAM_INTERRUPT_ENABLED == OAM_INTERRUPT_ENABLED,
+            GPU_modes::HBlank => {
+                return self.lcdc & HBLANK_INTERRUPT_ENABLED == HBLANK_INTERRUPT_ENABLED
+            }
+            GPU_modes::VBlank => {
+                return self.lcdc & VBLANK_INTERRUPT_ENABLED == VBLANK_INTERRUPT_ENABLED
+            }
+            GPU_modes::OAMSearch => {
+                return self.lcdc & OAM_INTERRUPT_ENABLED == OAM_INTERRUPT_ENABLED
+            }
             _ => return false,
         }
     }
@@ -287,12 +292,12 @@ impl GPU {
 
             GPU_modes::HBlank => {}
         }
-        if self.mode_interrupt_enabled(self.mode){
+        if self.mode_interrupt_enabled(self.mode) {
             self.stat_interrupt_req = true;
         }
     }
-    
-    pub fn lcdc(&self) -> u8{
+
+    pub fn lcdc(&self) -> u8 {
         return self.lcdc;
     }
 
@@ -354,15 +359,15 @@ impl GPU {
         self.obp1 = value;
     }
 
-    pub fn wy(&self) -> u8{
+    pub fn wy(&self) -> u8 {
         return self.wy;
     }
-    
+
     pub fn set_wy(&mut self, value: u8) {
         self.wy = value;
     }
 
-    pub fn wx(&self) -> u8{
+    pub fn wx(&self) -> u8 {
         return self.wx;
     }
 

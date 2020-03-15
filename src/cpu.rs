@@ -2,14 +2,16 @@ use crate::mmu::MMU;
 use crate::registers::CpuFlags;
 use crate::registers::Registers;
 use serde_json::*;
+extern crate bit_field;
 extern crate hex;
 use crate::apu::APU;
 use crate::gpu::GPU;
 use crate::interrupt_controller::InterruptController;
 use crate::joypad::*;
 use crate::link_cable::LinkCable;
-use crate::timer::Timer;
 use crate::memory_map::*;
+use crate::timer::Timer;
+use bit_field::BitField;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -25,6 +27,7 @@ pub struct CPU {
     pub timer: Timer,
     max_pc: u16,
     pub cb_prefix: bool,
+    pub halted: bool,
 }
 pub enum MBCType {
     MBC0,
@@ -42,6 +45,7 @@ impl CPU {
             timer: Timer::new(),
             max_pc: 0,
             cb_prefix: false,
+            halted: false,
         }
     }
 
@@ -96,8 +100,14 @@ impl CPU {
                 0x00..=0x07 => self.rlc_opcode(instruction),
                 // RRC Reg
                 0x08..=0x0F => self.rrc_opcode(instruction),
+                // SLA Reg
+                0x20..=0x2F => self.sla_opcode(instruction),
                 // Swap Reg
                 0x30..=0x37 => self.swap_opcode(instruction),
+                0x40..=0x7F => {
+                    let bit = parse_destination_register(instruction, 0x04);
+                    self.bit_opcode(instruction, bit)
+                }
                 0x80..=0xBF => {
                     let bit = parse_destination_register(instruction, 0x08);
                     self.res_opcode(instruction, bit)
@@ -445,11 +455,14 @@ impl CPU {
                 // Register Movements
                 0x40..=0x75 => self.register_movement(instruction),
                 // HALT TODO
-                0x76 => handle_unimplemented_instruction(instruction, false),
+                0x76 => {
+                    self.halted = true;
+                    1
+                }
                 // More Register Movements
                 0x77..=0x7F => self.register_movement(instruction),
                 // ADD A, Reg
-                0x80..=0x87 => self.alu_add8(instruction),
+                0x80..=0x87 => self.opcode_add8(instruction),
                 // ADC A, Reg
                 0x88..=0x8F => self.alu_adc8(instruction),
                 // SUB Reg
@@ -462,20 +475,31 @@ impl CPU {
                 0xA8..=0xAF => self.xor_opcode(instruction),
                 // OR Reg
                 0xB0..=0xB7 => self.or_opcode(instruction),
+                // CP (HL)
+                0xBE => {
+                    let value = self.get_byte_at_hl();
+                    self.alu_cp(value);
+                    2
+                }
                 // RET NZ
                 0xC0 => {
                     if !self.registers.get_flag(CpuFlags::Z) {
-                        self.ret(); 
+                        self.ret();
                         5
                     } else {
                         2
                     }
-                },
+                }
                 // POP BC
                 0xC1 => {
                     let value = self.pop_from_stack();
                     self.registers.setbc(value);
                     3
+                }
+                // JP NZ, a16
+                0xC2 => {
+                    let address = self.fetch_word();
+                    self.jp_if_nflag(address, CpuFlags::Z)
                 }
                 // JP a16
                 0xC3 => {
@@ -483,11 +507,22 @@ impl CPU {
                     self.jump_to(address);
                     4
                 }
+                // CALL NZ a16
+                0xC4 => {
+                    let address = self.fetch_word();
+                    self.call_if_nflag(address, CpuFlags::Z)
+                }
                 // PUSH BC
                 0xC5 => {
                     let value = self.registers.bc();
                     self.push_to_stack(value);
                     4
+                }
+                // ADD A, d8
+                0xC6 => {
+                    let value = self.fetch_byte();
+                    self.alu_add8(value);
+                    2
                 }
                 // RET Z
                 0xC8 => self.ret_if_flag(CpuFlags::Z),
@@ -511,6 +546,11 @@ impl CPU {
                     let value = self.fetch_word();
                     self.call(value);
                     6
+                }
+                // RST 0x08
+                0xCF => {
+                    self.rst(0x08);
+                    4
                 }
                 // POP DE
                 0xD1 => {
@@ -572,6 +612,12 @@ impl CPU {
                     self.write_byte(address, self.registers.a);
                     4
                 }
+                // XOR d8
+                0xEE => {
+                    let value = self.fetch_byte();
+                    self.alu_or(value);
+                    2
+                }
                 // RST 0x28
                 0xEF => {
                     self.rst(0x28);
@@ -599,6 +645,30 @@ impl CPU {
                     let value = self.registers.af();
                     self.push_to_stack(value);
                     4
+                }
+                // OR d8
+                0xF6 => {
+                    let value = self.fetch_byte();
+                    self.alu_or(value);
+                    2
+                }
+                // RST 0x30
+                0xF7 => {
+                    self.rst(0x30);
+                    4
+                }
+                // LD HL, SP+r8
+                0xf8 => {
+                    let value = self.fetch_byte() as i8 as i16 as u16;
+                    let sp = self.alu_add16(value, self.registers.sp);
+                    self.registers.sethl(sp);
+                    3
+                }
+                // LD SP, HL
+                0xF9 => {
+                    let value = self.registers.hl();
+                    self.registers.sp = value;
+                    2
                 }
                 // LD A, (a16)
                 0xFA => {
@@ -631,6 +701,26 @@ impl CPU {
     fn rst(&mut self, offset: u8) {
         self.push_to_stack(self.registers.pc);
         self.jump_to(offset as u16);
+    }
+
+    fn call_if_nflag(&mut self, address: u16, flag: CpuFlags) -> u8 {
+        if !self.registers.get_flag(flag) {
+            self.push_to_stack(self.registers.pc);
+            self.jump_to(address);
+            6
+        } else {
+            3
+        }
+    }
+
+    fn call_if_flag(&mut self, address: u16, flag: CpuFlags) -> u8 {
+        if self.registers.get_flag(flag) {
+            self.push_to_stack(self.registers.pc);
+            self.jump_to(address);
+            6
+        } else {
+            3
+        }
     }
 
     fn call(&mut self, address: u16) {
@@ -722,6 +812,19 @@ impl CPU {
         self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
     }
 
+    fn bit_opcode(&mut self, opcode: u8, bit: u8) -> u8 {
+        let operand_cycles = self.get_operand_and_cycles(opcode);
+        let operand = operand_cycles.0;
+
+        let value = operand.get_bit(bit as usize);
+
+        self.registers.set_flags(CpuFlags::Z, !value);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, true);
+
+        return operand_cycles.1;
+    }
+
     fn res_opcode(&mut self, opcode: u8, bit: u8) -> u8 {
         let operand_cycles = self.get_operand_and_cycles(opcode);
         let operand = operand_cycles.0;
@@ -739,6 +842,24 @@ impl CPU {
 
         let swap_value = ((operand & 0xf0) >> 4) | ((operand & 0x0f) << 4);
         return_value = return_value + self.write_to_register(opcode, swap_value);
+
+        return return_value;
+    }
+
+    fn sla_opcode(&mut self, opcode: u8) -> u8 {
+        let operand_cycles = self.get_operand_and_cycles(opcode);
+        let operand = operand_cycles.0;
+        let mut return_value = operand_cycles.1;
+
+        let r_value = operand << 1;
+
+        self.registers.set_flags(CpuFlags::Z, r_value == 0);
+        self.registers.set_flags(CpuFlags::N, false);
+        self.registers.set_flags(CpuFlags::H, false);
+        self.registers
+            .set_flags(CpuFlags::C, operand & 0x80 == 0x80);
+
+        return_value = return_value + self.write_to_register(opcode, r_value);
 
         return return_value;
     }
@@ -873,11 +994,7 @@ impl CPU {
         return return_value;
     }
 
-    fn alu_add8(&mut self, opcode: u8) -> u8 {
-        let operand_cycles = self.get_operand_and_cycles(opcode);
-        let operand = operand_cycles.0;
-        let return_value = operand_cycles.1;
-
+    fn alu_add8(&mut self, operand: u8) -> () {
         self.registers.a = self.registers.a.wrapping_add(operand);
         self.registers.set_flags(CpuFlags::N, false);
         self.registers
@@ -885,8 +1002,15 @@ impl CPU {
         self.registers
             .set_flags(CpuFlags::C, is_carry_add8(self.registers.a, operand));
         self.registers.set_flags(CpuFlags::Z, self.registers.a == 0);
+    }
 
-        return return_value;
+    fn opcode_add8(&mut self, opcode: u8) -> u8 {
+        let operand_cycles = self.get_operand_and_cycles(opcode);
+        let operand = operand_cycles.0;
+
+        self.alu_add8(operand);
+
+        return operand_cycles.1;
     }
 
     fn alu_add16(&mut self, a: u16, b: u16) -> u16 {
@@ -968,6 +1092,15 @@ impl CPU {
 
         self.registers.set_flags(CpuFlags::N, true);
         self.registers.set_flags(CpuFlags::H, true);
+    }
+
+    fn jp_if_nflag(&mut self, address: u16, flag: CpuFlags) -> u8 {
+        if !self.registers.get_flag(flag) {
+            self.jump_to(address);
+            return 4;
+        } else {
+            return 3;
+        }
     }
 
     fn jp_if_flag(&mut self, address: u16, flag: CpuFlags) -> u8 {
